@@ -235,9 +235,10 @@ class ClosetBottomSheet extends ConsumerWidget {
                               onPressed: () {
                                 Navigator.of(context).pop();
                                 Navigator.of(context).push(
-                                  MaterialPageRoute(
+                                   MaterialPageRoute(
                                     builder: (_) => ClothesCanvasScreen(
                                       couple: couple,
+                                      pet: pet,
                                       editingGarmentId: garment.id,
                                       initialGarmentName: garment.name,
                                     ),
@@ -289,7 +290,10 @@ class ClosetBottomSheet extends ConsumerWidget {
                       Navigator.of(context).pop();
                       Navigator.of(context).push(
                         MaterialPageRoute(
-                          builder: (_) => ClothesCanvasScreen(couple: couple),
+                          builder: (_) => ClothesCanvasScreen(
+                            couple: couple,
+                            pet: pet,
+                          ),
                         ),
                       );
                     },

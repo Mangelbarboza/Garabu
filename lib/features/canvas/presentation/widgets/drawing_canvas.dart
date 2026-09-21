@@ -22,6 +22,7 @@ class DrawingCanvas extends StatefulWidget {
   final Size canvasSize;
   final Widget? backgroundWidget;
   final Widget? overlayWidget;
+  final VoidCallback? onDrawingStarted;
   final void Function(DrawingCanvasController controller)? onControllerReady;
 
   const DrawingCanvas({
@@ -29,6 +30,7 @@ class DrawingCanvas extends StatefulWidget {
     required this.canvasSize,
     this.backgroundWidget,
     this.overlayWidget,
+    this.onDrawingStarted,
     this.onControllerReady,
   });
 
@@ -218,6 +220,7 @@ class DrawingCanvasState extends State<DrawingCanvas> {
           // Capa de captura de gestos y dibujo
           GestureDetector(
             onPanStart: (details) {
+              widget.onDrawingStarted?.call();
               if (_currentTool == CanvasTool.pencil) {
                 setState(() {
                   _activeLine = DrawnLine(
@@ -244,6 +247,7 @@ class DrawingCanvasState extends State<DrawingCanvas> {
               }
             },
             onTapUp: (details) {
+              widget.onDrawingStarted?.call();
               if (_currentTool == CanvasTool.bucket) {
                 _handleFloodFillTap(details.localPosition);
               }

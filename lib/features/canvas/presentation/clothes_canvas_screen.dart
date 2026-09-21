@@ -14,12 +14,14 @@ import 'widgets/eye_widget.dart';
 
 class ClothesCanvasScreen extends ConsumerStatefulWidget {
   final CoupleModel couple;
+  final PetModel? pet;
   final String? editingGarmentId;
   final String? initialGarmentName;
 
   const ClothesCanvasScreen({
     super.key,
     required this.couple,
+    this.pet,
     this.editingGarmentId,
     this.initialGarmentName,
   });
@@ -95,8 +97,10 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
 
       final petRepo = ref.read(petRepositoryProvider);
 
-      // Si viene desde el clóset (pareja ya en estado 'ready' o editando)
-      if (widget.couple.status == 'ready' || widget.editingGarmentId != null) {
+      // Si viene desde el clóset (pareja ya en estado 'ready', editando o con pet suministrado)
+      if (widget.couple.status == 'ready' ||
+          widget.editingGarmentId != null ||
+          widget.pet != null) {
         if (!mounted) return;
         final name = await _promptGarmentName(context, pet.closet.length + 1);
         if (name == null || name.isEmpty) {
@@ -165,9 +169,15 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
   Widget build(BuildContext context) {
     final coupleAsync = ref.watch(currentCoupleProvider(widget.couple.id));
     final currentCouple = coupleAsync.value ?? widget.couple;
+    final petId = widget.pet?.id ?? currentCouple.petId;
 
-    // Si aún no está listo el cuerpo, mostrar pantalla de espera requerida
-    if (currentCouple.status != 'drawing_clothes' || currentCouple.petId == null) {
+    // Solo mostrar pantalla de espera si estamos en onboarding inicial (esperando a que se dibuje el cuerpo)
+    final isWaitingForInitialBody = (currentCouple.status == 'waiting_partner' ||
+            currentCouple.status == 'drawing_body') &&
+        widget.pet == null &&
+        widget.editingGarmentId == null;
+
+    if (isWaitingForInitialBody || petId == null) {
       return Scaffold(
         backgroundColor: GarabuTheme.background,
         body: Center(
@@ -212,7 +222,7 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
       );
     }
 
-    final petAsync = ref.watch(currentPetProvider(currentCouple.petId!));
+    final petAsync = ref.watch(currentPetProvider(petId));
     return petAsync.when(
       loading: () => const Scaffold(
         backgroundColor: GarabuTheme.background,
@@ -275,7 +285,7 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
                   child: Text(
                     widget.editingGarmentId != null
                         ? 'Edita la prenda de ${pet.name}'
-                        : (widget.couple.status == 'ready'
+                        : (widget.couple.status == 'ready' || widget.pet != null || currentCouple.status == 'ready'
                             ? 'Diseña una nueva prenda para el clóset de ${pet.name}'
                             : 'Dibuja UNA prenda para ${pet.name}'),
                     textAlign: TextAlign.center,
@@ -287,7 +297,7 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
                   ),
                 ),
 
-                // Canvas con cuerpo y ojos fijados en el fondo (NO editables)
+                // Canvas con cuerpo y ojos fijados en el fondo (NO editables y totalmente inmóviles)
                 Expanded(
                   child: Center(
                     child: SingleChildScrollView(
@@ -315,9 +325,9 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
                                 // 1. Hoja de cuaderno
                                 const NotebookBackground(),
 
-                                // 2. Silueta de fondo a baja opacidad (Maniquí para calcar y ajustar la prenda)
+                                // 2. Silueta de fondo estática a opacidad óptima (Maniquí para calcar)
                                 Opacity(
-                                  opacity: 0.30,
+                                  opacity: 0.38,
                                   child: Stack(
                                     children: [
                                       GarabuImage(

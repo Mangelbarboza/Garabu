@@ -130,10 +130,14 @@ class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
     final canvasDimension = min(availableHeight, availableWidth).clamp(220.0, 420.0);
     final canvasSize = Size(canvasDimension, canvasDimension);
 
+    final isEditing = widget.pet.drawnFruits.containsKey(widget.fruit.key);
+
     return Scaffold(
       backgroundColor: GarabuTheme.background,
       appBar: AppBar(
-        title: Text('Dibuja: ${widget.fruit.name} ${widget.fruit.emoji}'),
+        title: Text(isEditing
+            ? 'Editar: ${widget.fruit.name} ${widget.fruit.emoji}'
+            : 'Dibuja: ${widget.fruit.name} ${widget.fruit.emoji}'),
         actions: [
           IconButton(
             tooltip: _showStencil ? 'Ocultar silueta guía' : 'Mostrar silueta guía',
@@ -180,7 +184,9 @@ class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
                   const Icon(Icons.gesture_rounded, size: 16, color: GarabuTheme.primaryBrown),
                   const SizedBox(width: 8),
                   Text(
-                    'Calca la silueta de la ${widget.fruit.name.toLowerCase()} o crea tu versión única',
+                    isEditing
+                        ? 'Rediseña la ${widget.fruit.name.toLowerCase()} a tu gusto'
+                        : 'Calca la silueta de la ${widget.fruit.name.toLowerCase()} o crea tu versión única',
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 13,
@@ -215,6 +221,12 @@ class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
                       clipBehavior: Clip.antiAlias,
                       child: DrawingCanvas(
                         canvasSize: canvasSize,
+                        onDrawingStarted: () {
+                          // Ocultar la silueta sombra de la fruta apenas se comienza a dibujar
+                          if (_showStencil) {
+                            setState(() => _showStencil = false);
+                          }
+                        },
                         onControllerReady: (c) {
                           _canvasController = c;
                           _canvasController?.setColor(_selectedDrawColor);

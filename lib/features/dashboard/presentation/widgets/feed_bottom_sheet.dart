@@ -218,69 +218,108 @@ class FeedBottomSheet extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  child: Stack(
                     children: [
-                      // Imagen dibujada o Emoji bloqueado
-                      Container(
-                        width: 52,
-                        height: 52,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: isDrawn
-                              ? Colors.white
-                              : GarabuTheme.warmSand.withValues(alpha: 0.3),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Center(
-                          child: isDrawn && imageUrl != null
-                              ? Padding(
-                                  padding: const EdgeInsets.all(4.0),
-                                  child: GarabuImage(
-                                    imageUrl: imageUrl,
-                                    fit: BoxFit.contain,
-                                  ),
-                                )
-                              : Text(
-                                  fruit.emoji,
-                                  style: TextStyle(
-                                    fontSize: 28,
-                                    color: Colors.grey.withValues(alpha: 0.6),
-                                  ),
+                      Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Imagen dibujada o Emoji bloqueado
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                shape: BoxShape.circle,
+                                color: isDrawn
+                                    ? Colors.white
+                                    : GarabuTheme.warmSand.withValues(alpha: 0.3),
+                              ),
+                              clipBehavior: Clip.antiAlias,
+                              child: Center(
+                                child: isDrawn && imageUrl != null
+                                    ? Padding(
+                                        padding: const EdgeInsets.all(4.0),
+                                        child: GarabuImage(
+                                          imageUrl: imageUrl,
+                                          fit: BoxFit.contain,
+                                        ),
+                                      )
+                                    : Text(
+                                        fruit.emoji,
+                                        style: TextStyle(
+                                          fontSize: 28,
+                                          color: Colors.grey.withValues(alpha: 0.6),
+                                        ),
+                                      ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+
+                            // Nombre de la fruta
+                            Text(
+                              fruit.name,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.bold,
+                                color: GarabuTheme.deepEspresso,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+
+                            // Estado / Botón
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: isDrawn
+                                    ? const Color(0xFFE8F5E9)
+                                    : GarabuTheme.warmSand.withValues(alpha: 0.5),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                isDrawn ? 'Alimentar' : 'Dibujar',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                  color: isDrawn ? const Color(0xFF2E7D32) : GarabuTheme.textSecondary,
                                 ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 8),
 
-                      // Nombre de la fruta
-                      Text(
-                        fruit.name,
-                        style: const TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.bold,
-                          color: GarabuTheme.deepEspresso,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-
-                      // Estado / Botón
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isDrawn
-                              ? const Color(0xFFE8F5E9)
-                              : GarabuTheme.warmSand.withValues(alpha: 0.5),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          isDrawn ? 'Alimentar' : 'Dibujar',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isDrawn ? const Color(0xFF2E7D32) : GarabuTheme.textSecondary,
+                      // Botón para editar la fruta dibujada
+                      if (isDrawn)
+                        Positioned(
+                          top: 6,
+                          right: 6,
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: () {
+                                Navigator.of(context).pop();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
+                                  ),
+                                );
+                              },
+                              borderRadius: BorderRadius.circular(12),
+                              child: Container(
+                                padding: const EdgeInsets.all(5),
+                                decoration: BoxDecoration(
+                                  color: GarabuTheme.warmSand.withValues(alpha: 0.4),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.edit_outlined,
+                                  size: 14,
+                                  color: GarabuTheme.primaryBrown,
+                                ),
+                              ),
+                            ),
                           ),
                         ),
-                      ),
                     ],
                   ),
                 ),
