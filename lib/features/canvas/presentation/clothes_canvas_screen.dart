@@ -1,9 +1,9 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/garabu_theme.dart';
 import '../../../core/widgets/notebook_background.dart';
+import '../../../core/widgets/garabu_image.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../lobby/data/lobby_repository.dart';
 import '../../lobby/domain/couple_model.dart';
@@ -160,25 +160,6 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
     }
   }
 
-  Widget _buildBodyImage(String imageUrl, Size size) {
-    if (imageUrl.startsWith('data:image/png;base64,')) {
-      final base64Data = imageUrl.replaceFirst('data:image/png;base64,', '');
-      return Image.memory(
-        base64Decode(base64Data),
-        width: size.width,
-        height: size.height,
-        fit: BoxFit.contain,
-      );
-    } else {
-      return Image.network(
-        imageUrl,
-        width: size.width,
-        height: size.height,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const SizedBox(),
-      );
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -334,25 +315,33 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
                                 // 1. Hoja de cuaderno
                                 const NotebookBackground(),
 
-                                // 2. Cuerpo dibujado por Usuario 1 (no editable)
-                                _buildBodyImage(pet.bodyImageUrl, canvasSize),
-
-                                // 3. Ojo Izquierdo fijado
-                                StaticEyeOverlay(
-                                  position: pet.eyesConfig.leftEye,
-                                  canvasSize: canvasSize,
-                                  color: Color(pet.eyesConfig.color),
-                                  hasEyelashes: pet.eyesConfig.hasEyelashes,
-                                  isLeft: true,
-                                ),
-
-                                // 4. Ojo Derecho fijado
-                                StaticEyeOverlay(
-                                  position: pet.eyesConfig.rightEye,
-                                  canvasSize: canvasSize,
-                                  color: Color(pet.eyesConfig.color),
-                                  hasEyelashes: pet.eyesConfig.hasEyelashes,
-                                  isLeft: false,
+                                // 2. Silueta de fondo a baja opacidad (Maniquí para calcar y ajustar la prenda)
+                                Opacity(
+                                  opacity: 0.30,
+                                  child: Stack(
+                                    children: [
+                                      GarabuImage(
+                                        imageUrl: pet.bodyImageUrl,
+                                        width: canvasSize.width,
+                                        height: canvasSize.height,
+                                        fit: BoxFit.contain,
+                                      ),
+                                      StaticEyeOverlay(
+                                        position: pet.eyesConfig.leftEye,
+                                        canvasSize: canvasSize,
+                                        color: Color(pet.eyesConfig.color),
+                                        hasEyelashes: pet.eyesConfig.hasEyelashes,
+                                        isLeft: true,
+                                      ),
+                                      StaticEyeOverlay(
+                                        position: pet.eyesConfig.rightEye,
+                                        canvasSize: canvasSize,
+                                        color: Color(pet.eyesConfig.color),
+                                        hasEyelashes: pet.eyesConfig.hasEyelashes,
+                                        isLeft: false,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ),

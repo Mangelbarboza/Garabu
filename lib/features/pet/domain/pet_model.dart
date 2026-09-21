@@ -131,11 +131,14 @@ class PetModel {
   final String name;
   final String bodyImageUrl;
   final String? clothesImageUrl;
+  final String? backgroundUrl;
   final EyesConfig eyesConfig;
   final List<GarmentItem> closet;
   final String? activeGarmentId;
   final Map<String, String> drawnFruits;
   final DateTime? lastFedAt;
+  final DateTime? lastWateredAt;
+  final bool isSleeping;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -145,11 +148,14 @@ class PetModel {
     required this.name,
     required this.bodyImageUrl,
     this.clothesImageUrl,
+    this.backgroundUrl,
     required this.eyesConfig,
     this.closet = const [],
     this.activeGarmentId,
     this.drawnFruits = const {},
     this.lastFedAt,
+    this.lastWateredAt,
+    this.isSleeping = false,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -161,11 +167,14 @@ class PetModel {
       'name': name,
       'bodyImageUrl': bodyImageUrl,
       'clothesImageUrl': clothesImageUrl,
+      'backgroundUrl': backgroundUrl,
       'eyesConfig': eyesConfig.toMap(),
       'closet': closet.map((g) => g.toMap()).toList(),
       'activeGarmentId': activeGarmentId,
       'drawnFruits': drawnFruits,
       'lastFedAt': lastFedAt?.toIso8601String(),
+      'lastWateredAt': lastWateredAt?.toIso8601String(),
+      'isSleeping': isSleeping,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -178,8 +187,7 @@ class PetModel {
             .toList() ??
         [];
 
-    // Si el clóset no tiene prendas pero hay una prenda inicial registrada,
-    // se migra automáticamente como la primera prenda (Slot 1)
+    // Migración automática de primera prenda a Slot 1
     List<GarmentItem> resolvedCloset = List.from(rawCloset);
     String? resolvedActiveGarmentId = map['activeGarmentId'] as String?;
 
@@ -205,6 +213,7 @@ class PetModel {
       name: map['name'] ?? 'Garabito',
       bodyImageUrl: map['bodyImageUrl'] ?? '',
       clothesImageUrl: rawClothesUrl,
+      backgroundUrl: map['backgroundUrl'] as String?,
       eyesConfig: EyesConfig.fromMap(
         map['eyesConfig'] is Map<String, dynamic> ? map['eyesConfig'] : {},
       ),
@@ -214,6 +223,10 @@ class PetModel {
       lastFedAt: map['lastFedAt'] != null
           ? DateTime.tryParse(map['lastFedAt'])
           : null,
+      lastWateredAt: map['lastWateredAt'] != null
+          ? DateTime.tryParse(map['lastWateredAt'])
+          : null,
+      isSleeping: map['isSleeping'] as bool? ?? false,
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
           : DateTime.now(),
@@ -229,11 +242,14 @@ class PetModel {
     String? name,
     String? bodyImageUrl,
     String? clothesImageUrl,
+    String? backgroundUrl,
     EyesConfig? eyesConfig,
     List<GarmentItem>? closet,
     String? activeGarmentId,
     Map<String, String>? drawnFruits,
     DateTime? lastFedAt,
+    DateTime? lastWateredAt,
+    bool? isSleeping,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -243,11 +259,14 @@ class PetModel {
       name: name ?? this.name,
       bodyImageUrl: bodyImageUrl ?? this.bodyImageUrl,
       clothesImageUrl: clothesImageUrl ?? this.clothesImageUrl,
+      backgroundUrl: backgroundUrl ?? this.backgroundUrl,
       eyesConfig: eyesConfig ?? this.eyesConfig,
       closet: closet ?? this.closet,
       activeGarmentId: activeGarmentId ?? this.activeGarmentId,
       drawnFruits: drawnFruits ?? this.drawnFruits,
       lastFedAt: lastFedAt ?? this.lastFedAt,
+      lastWateredAt: lastWateredAt ?? this.lastWateredAt,
+      isSleeping: isSleeping ?? this.isSleeping,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

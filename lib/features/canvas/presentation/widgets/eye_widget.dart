@@ -258,6 +258,8 @@ class StaticEyeOverlay extends StatelessWidget {
   final bool hasEyelashes;
   final bool isLeft;
   final double eyeSize;
+  final double blinkProgress;
+  final bool isHappy;
 
   const StaticEyeOverlay({
     super.key,
@@ -267,6 +269,8 @@ class StaticEyeOverlay extends StatelessWidget {
     required this.hasEyelashes,
     required this.isLeft,
     this.eyeSize = 30.0,
+    this.blinkProgress = 0.0,
+    this.isHappy = false,
   });
 
   @override
@@ -282,6 +286,8 @@ class StaticEyeOverlay extends StatelessWidget {
         color: color,
         hasEyelashes: hasEyelashes,
         isLeft: isLeft,
+        blinkProgress: blinkProgress,
+        isHappy: isHappy,
       ),
     );
   }

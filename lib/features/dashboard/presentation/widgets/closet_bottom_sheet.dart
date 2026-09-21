@@ -1,7 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/garabu_theme.dart';
+import '../../../../core/widgets/garabu_image.dart';
 import '../../../canvas/presentation/clothes_canvas_screen.dart';
 import '../../../lobby/domain/couple_model.dart';
 import '../../../pet/data/pet_repository.dart';
@@ -27,19 +27,10 @@ class ClosetBottomSheet extends ConsumerWidget {
   }
 
   Widget _buildGarmentThumbnail(String imageUrl) {
-    if (imageUrl.startsWith('data:image/png;base64,')) {
-      final base64Data = imageUrl.replaceFirst('data:image/png;base64,', '');
-      return Image.memory(
-        base64Decode(base64Data),
-        fit: BoxFit.contain,
-      );
-    } else {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded, color: GarabuTheme.textSecondary),
-      );
-    }
+    return GarabuImage(
+      imageUrl: imageUrl,
+      fit: BoxFit.contain,
+    );
   }
 
   @override
@@ -84,7 +75,7 @@ class ClosetBottomSheet extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    'Clóset de Creaciones 👗',
+                    'Clóset de Prendas',
                     style: TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -194,7 +185,7 @@ class ClosetBottomSheet extends ConsumerWidget {
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: const Text(
-                                        'Puesta ✨',
+                                        'Puesta',
                                         style: TextStyle(
                                           color: Colors.white,
                                           fontSize: 10,

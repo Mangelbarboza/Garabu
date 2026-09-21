@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:firebase_core/firebase_core.dart';
 import '../domain/pet_model.dart';
 
@@ -18,15 +17,13 @@ final currentPetProvider = StreamProvider.family<PetModel?, String>((ref, petId)
 
 class PetRepository {
   final FirebaseFirestore? _firestore;
-  final FirebaseStorage? _storage;
 
   // Almacén en memoria para modo sin credenciales o pruebas locales
   static final Map<String, PetModel> _mockPets = {};
   static final Map<String, StreamController<PetModel?>> _mockControllers = {};
 
   PetRepository()
-      : _firestore = Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null,
-        _storage = Firebase.apps.isNotEmpty ? FirebaseStorage.instance : null;
+      : _firestore = Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null;
 
   Stream<PetModel?> watchPet(String petId) {
     if (_firestore != null) {
@@ -57,27 +54,16 @@ class PetRepository {
     }
   }
 
+  /// Guarda la imagen como Data URI Base64 directa.
+  /// Esto garantiza 100% de compatibilidad en Web y Móvil sin bloqueos de CORS,
+  /// asegurando que las previews y miniaturas siempre se vean instantáneamente.
   Future<String> uploadImageBytes({
     required String coupleId,
     required String filename,
     required Uint8List bytes,
   }) async {
-    if (_storage != null) {
-      try {
-        final ref = _storage!.ref().child('couples/$coupleId/$filename');
-        final metadata = SettableMetadata(contentType: 'image/png');
-        final uploadTask = await ref.putData(bytes, metadata);
-        return await uploadTask.ref.getDownloadURL();
-      } catch (e) {
-        // En navegadores web, Firebase Storage bloquea peticiones si falta CORS.
-        // El fallback garantiza funcionamiento guardando como Data URI en Base64.
-        final base64String = base64Encode(bytes);
-        return 'data:image/png;base64,$base64String';
-      }
-    } else {
-      final base64String = base64Encode(bytes);
-      return 'data:image/png;base64,$base64String';
-    }
+    final base64String = base64Encode(bytes);
+    return 'data:image/png;base64,$base64String';
   }
 
   Future<PetModel> createPet({
@@ -133,7 +119,7 @@ class PetRepository {
 
     final now = DateTime.now();
     final initialGarment = GarmentItem(
-      id: 'garment_initial',
+      id: 'initial_garment',
       name: 'Prenda Inicial',
       imageUrl: clothesUrl,
       createdAt: now,
@@ -142,7 +128,7 @@ class PetRepository {
     if (_firestore != null) {
       await _firestore!.collection('pets').doc(petId).set({
         'clothesImageUrl': clothesUrl,
-        'activeGarmentId': 'garment_initial',
+        'activeGarmentId': 'initial_garment',
         'closet': [initialGarment.toMap()],
         'updatedAt': now.toIso8601String(),
       }, SetOptions(merge: true));
@@ -150,7 +136,7 @@ class PetRepository {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
           clothesImageUrl: clothesUrl,
-          activeGarmentId: 'garment_initial',
+          activeGarmentId: 'initial_garment',
           closet: [initialGarment],
           updatedAt: now,
         );
@@ -390,6 +376,85 @@ class PetRepository {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
           lastFedAt: now,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Sed: Dar agua a la mascota
+  Future<void> waterPet({
+    required String petId,
+  }) async {
+    final now = DateTime.now();
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'lastWateredAt': now.toIso8601String(),
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          lastWateredAt: now,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Sueño: Apagar / Encender la luz
+  Future<void> toggleSleep({
+    required String petId,
+    required bool isSleeping,
+  }) async {
+    final now = DateTime.now();
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'isSleeping': isSleeping,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          isSleeping: isSleeping,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Fondos: Guardar fondo dibujado
+  Future<void> updateBackground({
+    required String petId,
+    required String coupleId,
+    required Uint8List? backgroundBytes,
+  }) async {
+    final now = DateTime.now();
+    String? backgroundUrl;
+
+    if (backgroundBytes != null) {
+      backgroundUrl = await uploadImageBytes(
+        coupleId: coupleId,
+        filename: 'background_$petId.png',
+        bytes: backgroundBytes,
+      );
+    }
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'backgroundUrl': backgroundUrl,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          backgroundUrl: backgroundUrl,
           updatedAt: now,
         );
         _mockPets[petId] = updated;

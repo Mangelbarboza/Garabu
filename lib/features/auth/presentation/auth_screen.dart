@@ -30,6 +30,31 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     super.dispose();
   }
 
+  String _parseAuthError(Object error) {
+    final str = error.toString().toLowerCase();
+    if (str.contains('invalid-credential') ||
+        str.contains('wrong-password') ||
+        str.contains('user-not-found')) {
+      return 'El correo o la contraseña no coinciden. Por favor verifica tus datos.';
+    }
+    if (str.contains('email-already-in-use')) {
+      return 'Este correo ya tiene una cuenta creada. Intenta iniciar sesión.';
+    }
+    if (str.contains('invalid-email')) {
+      return 'El formato del correo electrónico no es válido.';
+    }
+    if (str.contains('weak-password')) {
+      return 'La contraseña debe tener al menos 6 caracteres.';
+    }
+    if (str.contains('network') || str.contains('socket') || str.contains('timeout')) {
+      return 'No se pudo conectar. Comprueba tu conexión a internet.';
+    }
+    if (str.contains('popup-closed-by-user')) {
+      return 'Inicio con Google cancelado.';
+    }
+    return 'Hubo un detalle con tus datos. Por favor revisa e intenta de nuevo.';
+  }
+
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -56,7 +81,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       }
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+        _errorMessage = _parseAuthError(e);
       });
     } finally {
       if (mounted) {
@@ -78,7 +103,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       await authRepo.signInWithGoogle();
     } catch (e) {
       setState(() {
-        _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+        _errorMessage = _parseAuthError(e);
       });
     } finally {
       if (mounted) {
@@ -133,20 +158,31 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 36),
+                    const SizedBox(height: 28),
 
                     if (_errorMessage != null) ...[
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFFDE8E8),
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: const Color(0xFFF8B4B4)),
+                          color: const Color(0xFFFFF8E1),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFFFFD54F)),
                         ),
-                        child: Text(
-                          _errorMessage!,
-                          style: const TextStyle(color: Color(0xFF9B1C1C), fontSize: 13),
-                          textAlign: TextAlign.center,
+                        child: Row(
+                          children: [
+                            const Icon(Icons.info_outline_rounded, size: 20, color: Color(0xFFE65100)),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _errorMessage!,
+                                style: const TextStyle(
+                                  color: Color(0xFFBF360C),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       const SizedBox(height: 16),

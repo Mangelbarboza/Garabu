@@ -1,23 +1,26 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../../core/theme/garabu_theme.dart';
+import '../../../../core/widgets/garabu_image.dart';
 import '../../../canvas/presentation/fruit_canvas_screen.dart';
 import '../../../pet/domain/pet_model.dart';
 
 class FeedBottomSheet extends StatelessWidget {
   final PetModel pet;
   final void Function(FruitInfo fruit)? onFruitFed;
+  final VoidCallback? onWaterGiven;
 
   const FeedBottomSheet({
     super.key,
     required this.pet,
     this.onFruitFed,
+    this.onWaterGiven,
   });
 
   static void show({
     required BuildContext context,
     required PetModel pet,
     required void Function(FruitInfo fruit) onFruitFed,
+    VoidCallback? onWaterGiven,
   }) {
     showModalBottomSheet(
       context: context,
@@ -26,24 +29,9 @@ class FeedBottomSheet extends StatelessWidget {
       builder: (_) => FeedBottomSheet(
         pet: pet,
         onFruitFed: onFruitFed,
+        onWaterGiven: onWaterGiven,
       ),
     );
-  }
-
-  Widget _buildFruitImage(String imageUrl) {
-    if (imageUrl.startsWith('data:image/png;base64,')) {
-      final base64Data = imageUrl.replaceFirst('data:image/png;base64,', '');
-      return Image.memory(
-        base64Decode(base64Data),
-        fit: BoxFit.contain,
-      );
-    } else {
-      return Image.network(
-        imageUrl,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => const Icon(Icons.broken_image_rounded),
-      );
-    }
   }
 
   @override
@@ -65,7 +53,7 @@ class FeedBottomSheet extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Barra de agarre superior
+          // Barra de agarre
           Center(
             child: Container(
               width: 40,
@@ -86,7 +74,7 @@ class FeedBottomSheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Alimentar a ${pet.name} 🍎',
+                    'Alimentar a ${pet.name}',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -110,7 +98,7 @@ class FeedBottomSheet extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Text(
-                  '${drawnFruits.length}/${kAvailableFruits.length} listas',
+                  '${drawnFruits.length}/${kAvailableFruits.length} frutas',
                   style: const TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.bold,
@@ -120,7 +108,66 @@ class FeedBottomSheet extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 14),
+
+          // Tarjeta de Acción Rápida: Dar Agua Fresca (Sed)
+          InkWell(
+            onTap: () {
+              Navigator.of(context).pop();
+              if (onWaterGiven != null) {
+                onWaterGiven!();
+              }
+            },
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE1F5FE),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: const Color(0xFFB3E5FC)),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 38,
+                    height: 38,
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Text('💧', style: TextStyle(fontSize: 20)),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Dar agua fresca',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF0277BD),
+                          ),
+                        ),
+                        Text(
+                          'Mantén a ${pet.name} hidratado',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF01579B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF0277BD)),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
 
           // Grid de las 6 frutas
           GridView.builder(
@@ -184,11 +231,15 @@ class FeedBottomSheet extends StatelessWidget {
                               ? Colors.white
                               : GarabuTheme.warmSand.withValues(alpha: 0.3),
                         ),
+                        clipBehavior: Clip.antiAlias,
                         child: Center(
                           child: isDrawn && imageUrl != null
                               ? Padding(
                                   padding: const EdgeInsets.all(4.0),
-                                  child: _buildFruitImage(imageUrl),
+                                  child: GarabuImage(
+                                    imageUrl: imageUrl,
+                                    fit: BoxFit.contain,
+                                  ),
                                 )
                               : Text(
                                   fruit.emoji,
@@ -222,7 +273,7 @@ class FeedBottomSheet extends StatelessWidget {
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: Text(
-                          isDrawn ? 'Alimentar ✨' : 'Dibujar ✏️',
+                          isDrawn ? 'Alimentar' : 'Dibujar',
                           style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.bold,
