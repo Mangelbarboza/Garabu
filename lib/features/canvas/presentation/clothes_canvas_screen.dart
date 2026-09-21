@@ -1,7 +1,10 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/garabu_theme.dart';
+import '../../../core/utils/flood_fill.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/notebook_background.dart';
 import '../../../core/widgets/garabu_image.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
@@ -10,6 +13,7 @@ import '../../lobby/domain/couple_model.dart';
 import '../../pet/data/pet_repository.dart';
 import '../../pet/domain/pet_model.dart';
 import 'widgets/drawing_canvas.dart';
+import 'widgets/canvas_toolbar.dart';
 import 'widgets/eye_widget.dart';
 
 class ClothesCanvasScreen extends ConsumerStatefulWidget {
@@ -34,9 +38,24 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
   DrawingCanvasController? _canvasController;
   CanvasTool _selectedTool = CanvasTool.pencil;
   Color _selectedDrawColor = const Color(0xFF2C2420);
+  double _selectedStrokeWidth = 4.0;
+  BucketPower _selectedBucketPower = BucketPower.medium;
+  Uint8List? _existingGarmentBytes;
   bool _isExporting = false;
 
-  final List<Color> _paletteColors = GarabuTheme.canvasPalette;
+  @override
+  void initState() {
+    super.initState();
+    if (widget.editingGarmentId != null && widget.pet != null) {
+      final garment = widget.pet!.closet.cast<GarmentItem?>().firstWhere(
+            (g) => g?.id == widget.editingGarmentId,
+            orElse: () => null,
+          );
+      if (garment != null && garment.imageUrl.isNotEmpty) {
+        _existingGarmentBytes = decodeDataUri(garment.imageUrl);
+      }
+    }
+  }
 
   Future<String?> _promptGarmentName(BuildContext context, int defaultIndex) async {
     final controller = TextEditingController(
@@ -319,7 +338,16 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
                           clipBehavior: Clip.antiAlias,
                           child: DrawingCanvas(
                             canvasSize: canvasSize,
-                            onControllerReady: (c) => _canvasController = c,
+                            initialImageBytes: _existingGarmentBytes,
+                            onControllerReady: (c) {
+                              _canvasController = c;
+                              if (_existingGarmentBytes != null) {
+                                c.loadRasterImage(_existingGarmentBytes!);
+                              }
+                            },
+                            onColorPicked: (color) {
+                              setState(() => _selectedDrawColor = color);
+                            },
                             backgroundWidget: Stack(
                               children: [
                                 // 1. Hoja de cuaderno
@@ -362,139 +390,36 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
                   ),
                 ),
 
-                // Barra de Herramientas para Usuario 2 (Lápiz, Balde, Deshacer, Limpiar)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.04),
-                        blurRadius: 8,
-                        offset: const Offset(0, -2),
-                      ),
-                    ],
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildToolButton(
-                            icon: Icons.edit_rounded,
-                            label: 'Lápiz',
-                            isSelected: _selectedTool == CanvasTool.pencil,
-                            onTap: () {
-                              setState(() => _selectedTool = CanvasTool.pencil);
-                              _canvasController?.setTool(CanvasTool.pencil);
-                            },
-                          ),
-                          _buildToolButton(
-                            icon: Icons.format_color_fill_rounded,
-                            label: 'Balde',
-                            isSelected: _selectedTool == CanvasTool.bucket,
-                            onTap: () {
-                              setState(() => _selectedTool = CanvasTool.bucket);
-                              _canvasController?.setTool(CanvasTool.bucket);
-                            },
-                          ),
-                          _buildToolButton(
-                            icon: Icons.undo_rounded,
-                            label: 'Deshacer',
-                            isSelected: false,
-                            onTap: () => _canvasController?.undo(),
-                          ),
-                          _buildToolButton(
-                            icon: Icons.delete_outline_rounded,
-                            label: 'Limpiar',
-                            isSelected: false,
-                            onTap: () => _canvasController?.clear(),
-                          ),
-                        ],
-                      ),
-                      const Divider(height: 16, color: GarabuTheme.warmSand),
-
-                      // Paleta de Colores
-                      SizedBox(
-                        height: 36,
-                        child: ListView.separated(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: _paletteColors.length,
-                          separatorBuilder: (_, __) => const SizedBox(width: 8),
-                          itemBuilder: (context, index) {
-                            final color = _paletteColors[index];
-                            final isSelected = _selectedDrawColor == color;
-                            return GestureDetector(
-                              onTap: () {
-                                setState(() => _selectedDrawColor = color);
-                                _canvasController?.setColor(color);
-                              },
-                              child: Container(
-                                width: 32,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: color,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSelected
-                                        ? GarabuTheme.primaryBrown
-                                        : GarabuTheme.warmSand,
-                                    width: isSelected ? 2.5 : 1.2,
-                                  ),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
+                // Barra de herramientas completa con gotero, balde débil/medio/fuerte y 5 puntas
+                CanvasToolbar(
+                  selectedTool: _selectedTool,
+                  selectedColor: _selectedDrawColor,
+                  selectedStrokeWidth: _selectedStrokeWidth,
+                  selectedBucketPower: _selectedBucketPower,
+                  onToolChanged: (tool) {
+                    setState(() => _selectedTool = tool);
+                    _canvasController?.setTool(tool);
+                  },
+                  onColorChanged: (color) {
+                    setState(() => _selectedDrawColor = color);
+                    _canvasController?.setColor(color);
+                  },
+                  onStrokeWidthChanged: (width) {
+                    setState(() => _selectedStrokeWidth = width);
+                    _canvasController?.setStrokeWidth(width);
+                  },
+                  onBucketPowerChanged: (power) {
+                    setState(() => _selectedBucketPower = power);
+                    _canvasController?.setBucketPower(power);
+                  },
+                  onUndo: () => _canvasController?.undo(),
+                  onClear: () => _canvasController?.clear(),
                 ),
               ],
             ),
           ),
         );
       },
-    );
-  }
-
-  Widget _buildToolButton({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? GarabuTheme.warmSand.withValues(alpha: 0.5) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: GarabuTheme.primaryBrown) : null,
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.deepEspresso,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

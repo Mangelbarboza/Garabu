@@ -199,36 +199,193 @@ class PetRepository {
     }
   }
 
-  /// Clóset: Equipar o Quitar prenda
+  /// Clóset: Equipar o Quitar prenda (retrocompatibilidad)
   Future<void> equipGarment({
     required String petId,
     required String? garmentId,
   }) async {
+    if (garmentId == null) {
+      final now = DateTime.now();
+      if (_firestore != null) {
+        await _firestore!.collection('pets').doc(petId).set({
+          'activeGarmentId': null,
+          'equippedGarmentIds': [],
+          'clothesImageUrl': null,
+          'updatedAt': now.toIso8601String(),
+        }, SetOptions(merge: true));
+      } else if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          activeGarmentId: null,
+          equippedGarmentIds: [],
+          clothesImageUrl: null,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    } else {
+      await toggleEquipGarment(petId: petId, garmentId: garmentId);
+    }
+  }
+
+  /// Clóset: Alternar equipamiento de prenda (hasta 2 prendas simultáneas)
+  Future<void> toggleEquipGarment({
+    required String petId,
+    required String garmentId,
+  }) async {
     final current = await getPet(petId);
+    if (current == null) return;
     final now = DateTime.now();
 
-    String? newClothesUrl;
-    if (garmentId != null && current != null) {
+    List<String> equipped = List.from(current.resolvedEquippedGarmentIds);
+    if (equipped.contains(garmentId)) {
+      equipped.remove(garmentId);
+    } else {
+      if (equipped.length < 2) {
+        equipped.add(garmentId);
+      } else {
+        equipped = [equipped[1], garmentId];
+      }
+    }
+
+    String? primaryImageUrl;
+    if (equipped.isNotEmpty) {
       final found = current.closet.firstWhere(
-        (g) => g.id == garmentId,
+        (g) => g.id == equipped.first,
         orElse: () => GarmentItem(id: '', name: '', imageUrl: '', createdAt: now),
       );
-      if (found.imageUrl.isNotEmpty) {
-        newClothesUrl = found.imageUrl;
-      }
+      if (found.imageUrl.isNotEmpty) primaryImageUrl = found.imageUrl;
     }
 
     if (_firestore != null) {
       await _firestore!.collection('pets').doc(petId).set({
-        'activeGarmentId': garmentId,
-        'clothesImageUrl': newClothesUrl,
+        'equippedGarmentIds': equipped,
+        'activeGarmentId': equipped.isNotEmpty ? equipped.last : null,
+        'clothesImageUrl': primaryImageUrl,
         'updatedAt': now.toIso8601String(),
       }, SetOptions(merge: true));
     } else {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
-          activeGarmentId: garmentId,
-          clothesImageUrl: newClothesUrl,
+          equippedGarmentIds: equipped,
+          activeGarmentId: equipped.isNotEmpty ? equipped.last : null,
+          clothesImageUrl: primaryImageUrl,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Clóset: Ajustar posición (offset) de una prenda
+  Future<void> updateGarmentOffset({
+    required String petId,
+    required String garmentId,
+    required double offsetX,
+    required double offsetY,
+  }) async {
+    final current = await getPet(petId);
+    if (current == null) return;
+    final now = DateTime.now();
+
+    final closet = List<GarmentItem>.from(current.closet);
+    final index = closet.indexWhere((g) => g.id == garmentId);
+    if (index == -1) return;
+
+    closet[index] = closet[index].copyWith(offsetX: offsetX, offsetY: offsetY);
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'closet': closet.map((g) => g.toMap()).toList(),
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          closet: closet,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Fondos: Guardar fondo en uno de los 3 slots
+  Future<void> updateBackgroundSlot({
+    required String petId,
+    required String coupleId,
+    required int slotIndex,
+    Uint8List? backgroundBytes,
+    String? customUrl,
+  }) async {
+    final current = await getPet(petId);
+    if (current == null) return;
+    final now = DateTime.now();
+
+    final slots = List<String?>.from(current.backgroundSlots);
+    while (slots.length < 3) {
+      slots.add(null);
+    }
+
+    String? newBgUrl;
+    if (customUrl != null && customUrl.isNotEmpty) {
+      newBgUrl = customUrl;
+    } else if (backgroundBytes != null) {
+      newBgUrl = await uploadImageBytes(
+        coupleId: coupleId,
+        filename: 'background_slot_${slotIndex}_$petId.png',
+        bytes: backgroundBytes,
+      );
+    }
+    slots[slotIndex] = newBgUrl;
+
+    if (_firestore != null) {
+      final Map<String, dynamic> updateData = {
+        'backgroundSlots': slots,
+        'activeBackgroundSlotIndex': slotIndex,
+        'backgroundUrl': newBgUrl,
+        'updatedAt': now.toIso8601String(),
+      };
+      await _firestore!.collection('pets').doc(petId).set(updateData, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          backgroundSlots: slots,
+          activeBackgroundSlotIndex: slotIndex,
+          backgroundUrl: newBgUrl,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Fondos: Cambiar slot de fondo activo
+  Future<void> setActiveBackgroundSlot({
+    required String petId,
+    required int slotIndex,
+  }) async {
+    final current = await getPet(petId);
+    if (current == null) return;
+    final now = DateTime.now();
+
+    final slots = current.backgroundSlots;
+    final bgUrl = (slotIndex >= 0 && slotIndex < slots.length) ? slots[slotIndex] : null;
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'activeBackgroundSlotIndex': slotIndex,
+        'backgroundUrl': bgUrl,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          activeBackgroundSlotIndex: slotIndex,
+          backgroundUrl: bgUrl,
           updatedAt: now,
         );
         _mockPets[petId] = updated;

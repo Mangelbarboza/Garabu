@@ -31,6 +31,18 @@ class GarabuImage extends StatelessWidget {
       return placeholder ?? const SizedBox();
     }
 
+    // 0. Manejo de Assets locales
+    if (raw.startsWith('assets/')) {
+      return Image.asset(
+        raw,
+        width: width,
+        height: height,
+        fit: fit,
+        gaplessPlayback: true,
+        errorBuilder: (_, __, ___) => _buildFallback(),
+      );
+    }
+
     // 1. Manejo de Data URI en Base64
     if (raw.contains('base64,') || (!raw.startsWith('http://') && !raw.startsWith('https://') && raw.length > 50)) {
       try {

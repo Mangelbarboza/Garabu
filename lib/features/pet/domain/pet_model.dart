@@ -93,6 +93,8 @@ class GarmentItem {
   final String imageUrl;
   final String createdBy;
   final DateTime createdAt;
+  final double offsetX;
+  final double offsetY;
 
   const GarmentItem({
     required this.id,
@@ -100,6 +102,8 @@ class GarmentItem {
     required this.imageUrl,
     this.createdBy = '',
     required this.createdAt,
+    this.offsetX = 0.0,
+    this.offsetY = 0.0,
   });
 
   Map<String, dynamic> toMap() {
@@ -109,6 +113,8 @@ class GarmentItem {
       'imageUrl': imageUrl,
       'createdBy': createdBy,
       'createdAt': createdAt.toIso8601String(),
+      'offsetX': offsetX,
+      'offsetY': offsetY,
     };
   }
 
@@ -121,6 +127,8 @@ class GarmentItem {
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
           : DateTime.now(),
+      offsetX: (map['offsetX'] as num?)?.toDouble() ?? 0.0,
+      offsetY: (map['offsetY'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -130,6 +138,8 @@ class GarmentItem {
     String? imageUrl,
     String? createdBy,
     DateTime? createdAt,
+    double? offsetX,
+    double? offsetY,
   }) {
     return GarmentItem(
       id: id ?? this.id,
@@ -137,6 +147,8 @@ class GarmentItem {
       imageUrl: imageUrl ?? this.imageUrl,
       createdBy: createdBy ?? this.createdBy,
       createdAt: createdAt ?? this.createdAt,
+      offsetX: offsetX ?? this.offsetX,
+      offsetY: offsetY ?? this.offsetY,
     );
   }
 }
@@ -151,6 +163,9 @@ class PetModel {
   final EyesConfig eyesConfig;
   final List<GarmentItem> closet;
   final String? activeGarmentId;
+  final List<String> equippedGarmentIds;
+  final List<String?> backgroundSlots;
+  final int activeBackgroundSlotIndex;
   final Map<String, String> drawnFruits;
   final Map<String, int> foodInventory;
   final DateTime? lastFedAt;
@@ -170,6 +185,9 @@ class PetModel {
     required this.eyesConfig,
     this.closet = const [],
     this.activeGarmentId,
+    this.equippedGarmentIds = const [],
+    this.backgroundSlots = const [null, null, null],
+    this.activeBackgroundSlotIndex = 0,
     this.drawnFruits = const {},
     this.foodInventory = const {},
     this.lastFedAt,
@@ -179,6 +197,45 @@ class PetModel {
     required this.createdAt,
     required this.updatedAt,
   });
+
+  /// Hasta 2 prendas seleccionadas simultáneamente con retrocompatibilidad
+  List<String> get resolvedEquippedGarmentIds {
+    if (equippedGarmentIds.isNotEmpty) return equippedGarmentIds;
+    if (activeGarmentId != null && activeGarmentId!.isNotEmpty) return [activeGarmentId!];
+    return [];
+  }
+
+  /// Fondo activo resuelto de los 3 slots o fondo legacy
+  String? get resolvedBackgroundUrl {
+    if (backgroundSlots.isNotEmpty &&
+        activeBackgroundSlotIndex >= 0 &&
+        activeBackgroundSlotIndex < backgroundSlots.length) {
+      final slotUrl = backgroundSlots[activeBackgroundSlotIndex];
+      if (slotUrl != null && slotUrl.isNotEmpty) return slotUrl;
+    }
+    return backgroundUrl;
+  }
+
+  // Getters de salud y vitalidad
+  double get hunger {
+    if (lastFedAt == null) return 0.4;
+    final diffHours = DateTime.now().difference(lastFedAt!).inMinutes / 60.0;
+    return (1.0 - (diffHours / 6.0)).clamp(0.05, 1.0);
+  }
+
+  double get thirst {
+    if (lastWateredAt == null) return 0.5;
+    final diffHours = DateTime.now().difference(lastWateredAt!).inMinutes / 60.0;
+    return (1.0 - (diffHours / 4.0)).clamp(0.05, 1.0);
+  }
+
+  double get energy => isSleeping ? 1.0 : 0.75;
+
+  double get happiness {
+    if (lastPettedAt == null) return 0.5;
+    final diffMinutes = DateTime.now().difference(lastPettedAt!).inSeconds / 60.0;
+    return (1.0 - (diffMinutes / 30.0)).clamp(0.15, 1.0);
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -191,6 +248,9 @@ class PetModel {
       'eyesConfig': eyesConfig.toMap(),
       'closet': closet.map((g) => g.toMap()).toList(),
       'activeGarmentId': activeGarmentId,
+      'equippedGarmentIds': equippedGarmentIds,
+      'backgroundSlots': backgroundSlots,
+      'activeBackgroundSlotIndex': activeBackgroundSlotIndex,
       'drawnFruits': drawnFruits,
       'foodInventory': foodInventory,
       'lastFedAt': lastFedAt?.toIso8601String(),
@@ -224,6 +284,23 @@ class PetModel {
       resolvedActiveGarmentId ??= 'initial_garment';
     }
 
+    // Soporte para hasta 2 prendas equipadas
+    List<String> rawEquipped = [];
+    if (map['equippedGarmentIds'] is List) {
+      rawEquipped = (map['equippedGarmentIds'] as List).map((e) => e.toString()).toList();
+    } else if (resolvedActiveGarmentId != null && resolvedActiveGarmentId.isNotEmpty) {
+      rawEquipped = [resolvedActiveGarmentId];
+    }
+
+    // Soporte para 3 slots de fondo
+    List<String?> rawSlots = [null, null, null];
+    if (map['backgroundSlots'] is List) {
+      final list = map['backgroundSlots'] as List;
+      rawSlots = List.generate(3, (i) => i < list.length ? list[i]?.toString() : null);
+    } else if (map['backgroundUrl'] != null && (map['backgroundUrl'] as String).isNotEmpty) {
+      rawSlots[0] = map['backgroundUrl'] as String;
+    }
+
     final rawFruits = (map['drawnFruits'] as Map<String, dynamic>?)?.map(
           (key, value) => MapEntry(key, value.toString()),
         ) ??
@@ -246,6 +323,9 @@ class PetModel {
       ),
       closet: resolvedCloset,
       activeGarmentId: resolvedActiveGarmentId,
+      equippedGarmentIds: rawEquipped,
+      backgroundSlots: rawSlots,
+      activeBackgroundSlotIndex: (map['activeBackgroundSlotIndex'] as num?)?.toInt() ?? 0,
       drawnFruits: rawFruits,
       foodInventory: rawInventory,
       lastFedAt: map['lastFedAt'] != null
@@ -277,6 +357,9 @@ class PetModel {
     EyesConfig? eyesConfig,
     List<GarmentItem>? closet,
     String? activeGarmentId,
+    List<String>? equippedGarmentIds,
+    List<String?>? backgroundSlots,
+    int? activeBackgroundSlotIndex,
     Map<String, String>? drawnFruits,
     Map<String, int>? foodInventory,
     DateTime? lastFedAt,
@@ -296,6 +379,9 @@ class PetModel {
       eyesConfig: eyesConfig ?? this.eyesConfig,
       closet: closet ?? this.closet,
       activeGarmentId: activeGarmentId ?? this.activeGarmentId,
+      equippedGarmentIds: equippedGarmentIds ?? this.equippedGarmentIds,
+      backgroundSlots: backgroundSlots ?? this.backgroundSlots,
+      activeBackgroundSlotIndex: activeBackgroundSlotIndex ?? this.activeBackgroundSlotIndex,
       drawnFruits: drawnFruits ?? this.drawnFruits,
       foodInventory: foodInventory ?? this.foodInventory,
       lastFedAt: lastFedAt ?? this.lastFedAt,

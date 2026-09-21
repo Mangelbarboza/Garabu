@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/garabu_theme.dart';
 import '../../../../core/widgets/garabu_image.dart';
+import '../../../../core/widgets/notebook_background.dart';
 import '../../../canvas/presentation/clothes_canvas_screen.dart';
 import '../../../lobby/domain/couple_model.dart';
 import '../../../pet/data/pet_repository.dart';
@@ -33,10 +34,171 @@ class ClosetBottomSheet extends ConsumerWidget {
     );
   }
 
+  void _showAdjustPositionDialog(
+    BuildContext context,
+    WidgetRef ref,
+    PetModel pet,
+    GarmentItem garment,
+  ) {
+    double offsetX = garment.offsetX;
+    double offsetY = garment.offsetY;
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: GarabuTheme.cardSurface,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+              title: Row(
+                children: [
+                  const Icon(Icons.open_with_rounded, color: GarabuTheme.primaryBrown),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Ajustar "${garment.name}"',
+                      style: const TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: GarabuTheme.deepEspresso,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Arrastra la prenda o usa las flechas para calzarla exactamente sobre el cuerpo:',
+                    style: TextStyle(fontSize: 12.5, color: GarabuTheme.textSecondary),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Lienzo de Previsualización y Arrastre
+                  Container(
+                    width: 220,
+                    height: 220,
+                    decoration: BoxDecoration(
+                      color: GarabuTheme.paperWhite,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: GarabuTheme.warmSand, width: 1.5),
+                    ),
+                    clipBehavior: Clip.antiAlias,
+                    child: Stack(
+                      children: [
+                        const NotebookBackground(),
+                        // Silueta base del personaje
+                        Opacity(
+                          opacity: 0.65,
+                          child: GarabuImage(
+                            imageUrl: pet.bodyImageUrl,
+                            width: 220,
+                            height: 220,
+                            fit: BoxFit.contain,
+                          ),
+                        ),
+                        // Prenda con desplazamiento interactivo
+                        Positioned.fill(
+                          child: GestureDetector(
+                            onPanUpdate: (details) {
+                              setDialogState(() {
+                                offsetX += details.delta.dx;
+                                offsetY += details.delta.dy;
+                              });
+                            },
+                            child: Transform.translate(
+                              offset: Offset(offsetX, offsetY),
+                              child: GarabuImage(
+                                imageUrl: garment.imageUrl,
+                                width: 220,
+                                height: 220,
+                                fit: BoxFit.contain,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Controles de Flechas direccionales finas
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        tooltip: 'Mover Izquierda',
+                        icon: const Icon(Icons.arrow_back_rounded, color: GarabuTheme.primaryBrown),
+                        onPressed: () => setDialogState(() => offsetX -= 3),
+                      ),
+                      Column(
+                        children: [
+                          IconButton(
+                            tooltip: 'Mover Arriba',
+                            icon: const Icon(Icons.arrow_upward_rounded, color: GarabuTheme.primaryBrown),
+                            onPressed: () => setDialogState(() => offsetY -= 3),
+                          ),
+                          IconButton(
+                            tooltip: 'Mover Abajo',
+                            icon: const Icon(Icons.arrow_downward_rounded, color: GarabuTheme.primaryBrown),
+                            onPressed: () => setDialogState(() => offsetY += 3),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        tooltip: 'Mover Derecha',
+                        icon: const Icon(Icons.arrow_forward_rounded, color: GarabuTheme.primaryBrown),
+                        onPressed: () => setDialogState(() => offsetX += 3),
+                      ),
+                      const SizedBox(width: 12),
+                      TextButton(
+                        onPressed: () => setDialogState(() {
+                          offsetX = 0;
+                          offsetY = 0;
+                        }),
+                        child: const Text('Centrar', style: TextStyle(fontSize: 12)),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: const Text('Cancelar', style: TextStyle(color: GarabuTheme.textSecondary)),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    Navigator.of(ctx).pop();
+                    await ref.read(petRepositoryProvider).updateGarmentOffset(
+                          petId: pet.id,
+                          garmentId: garment.id,
+                          offsetX: offsetX,
+                          offsetY: offsetY,
+                        );
+                  },
+                  child: const Text('Guardar Posición'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    // Reactividad en vivo: observar siempre la mascota en tiempo real para refresco automático
+    final petAsync = ref.watch(currentPetProvider(pet.id));
+    final livePet = petAsync.value ?? pet;
     final petRepo = ref.read(petRepositoryProvider);
-    final closet = pet.closet;
+    final closet = livePet.closet;
+    final equippedIds = livePet.resolvedEquippedGarmentIds;
     const maxSlots = 5;
 
     return Container(
@@ -84,7 +246,7 @@ class ClosetBottomSheet extends ConsumerWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    'Prendas compartidas para ${pet.name}',
+                    'Hasta 2 prendas a la vez para ${livePet.name}',
                     style: const TextStyle(
                       fontSize: 13,
                       color: GarabuTheme.textSecondary,
@@ -123,7 +285,8 @@ class ClosetBottomSheet extends ConsumerWidget {
 
                 if (hasItem) {
                   final garment = closet[index];
-                  final bool isEquipped = pet.activeGarmentId == garment.id;
+                  final bool isEquipped = equippedIds.contains(garment.id);
+                  final int equipIndex = equippedIds.indexOf(garment.id);
 
                   return Container(
                     padding: const EdgeInsets.all(12),
@@ -168,12 +331,15 @@ class ClosetBottomSheet extends ConsumerWidget {
                             children: [
                               Row(
                                 children: [
-                                  Text(
-                                    garment.name,
-                                    style: const TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.bold,
-                                      color: GarabuTheme.deepEspresso,
+                                  Flexible(
+                                    child: Text(
+                                      garment.name,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        fontWeight: FontWeight.bold,
+                                        color: GarabuTheme.deepEspresso,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
                                   if (isEquipped) ...[
@@ -184,9 +350,9 @@ class ClosetBottomSheet extends ConsumerWidget {
                                         color: GarabuTheme.primaryBrown,
                                         borderRadius: BorderRadius.circular(8),
                                       ),
-                                      child: const Text(
-                                        'Puesta',
-                                        style: TextStyle(
+                                      child: Text(
+                                        equippedIds.length > 1 ? 'Puesta #${equipIndex + 1}' : 'Puesta',
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontSize: 10,
                                           fontWeight: FontWeight.bold,
@@ -208,37 +374,43 @@ class ClosetBottomSheet extends ConsumerWidget {
                           ),
                         ),
 
-                        // Acciones: Poner / Quitar, Editar, Eliminar
+                        // Acciones: Poner / Quitar, Mover Posición, Editar, Eliminar
                         Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            // Botón Poner / Quitar
+                            // Botón Poner / Quitar (soporta hasta 2 a la vez)
                             IconButton(
-                              tooltip: isEquipped ? 'Quitar prenda' : 'Poner prenda',
+                              tooltip: isEquipped ? 'Quitar prenda' : 'Poner prenda (hasta 2)',
                               icon: Icon(
                                 isEquipped ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
                                 color: isEquipped ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
                               ),
                               onPressed: () async {
-                                final newActive = isEquipped ? null : garment.id;
-                                await petRepo.equipGarment(
-                                  petId: pet.id,
-                                  garmentId: newActive,
+                                await petRepo.toggleEquipGarment(
+                                  petId: livePet.id,
+                                  garmentId: garment.id,
                                 );
                               },
                             ),
 
+                            // Botón Ajustar Posición (Mover sobre la mascota)
+                            IconButton(
+                              tooltip: 'Mover y ajustar posición',
+                              icon: const Icon(Icons.open_with_rounded, size: 20, color: GarabuTheme.deepEspresso),
+                              onPressed: () => _showAdjustPositionDialog(context, ref, livePet, garment),
+                            ),
+
                             // Botón Editar
                             IconButton(
-                              tooltip: 'Editar prenda',
+                              tooltip: 'Editar dibujo de prenda',
                               icon: const Icon(Icons.edit_outlined, size: 20, color: GarabuTheme.primaryBrown),
                               onPressed: () {
                                 Navigator.of(context).pop();
                                 Navigator.of(context).push(
-                                   MaterialPageRoute(
+                                  MaterialPageRoute(
                                     builder: (_) => ClothesCanvasScreen(
                                       couple: couple,
-                                      pet: pet,
+                                      pet: livePet,
                                       editingGarmentId: garment.id,
                                       initialGarmentName: garment.name,
                                     ),
@@ -272,7 +444,7 @@ class ClosetBottomSheet extends ConsumerWidget {
                                 );
                                 if (confirm == true) {
                                   await petRepo.deleteGarment(
-                                    petId: pet.id,
+                                    petId: livePet.id,
                                     garmentId: garment.id,
                                   );
                                 }
@@ -292,7 +464,7 @@ class ClosetBottomSheet extends ConsumerWidget {
                         MaterialPageRoute(
                           builder: (_) => ClothesCanvasScreen(
                             couple: couple,
-                            pet: pet,
+                            pet: livePet,
                           ),
                         ),
                       );
@@ -338,7 +510,7 @@ class ClosetBottomSheet extends ConsumerWidget {
                                 ),
                               ),
                               const Text(
-                                'Toca para dibujar una nueva prenda',
+                                'Toca para diseñar una prenda',
                                 style: TextStyle(
                                   fontSize: 12,
                                   color: GarabuTheme.textSecondary,

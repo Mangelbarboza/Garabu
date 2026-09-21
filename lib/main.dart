@@ -12,6 +12,9 @@ import 'features/dashboard/presentation/dashboard_screen.dart';
 import 'features/lobby/data/lobby_repository.dart';
 import 'features/lobby/presentation/lobby_screen.dart';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:firebase_auth/firebase_auth.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -19,6 +22,9 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    if (kIsWeb) {
+      await FirebaseAuth.instance.setPersistence(Persistence.LOCAL);
+    }
   } catch (e) {
     debugPrint('Error al inicializar Firebase: $e');
   }

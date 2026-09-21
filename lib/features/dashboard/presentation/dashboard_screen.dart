@@ -17,6 +17,7 @@ import '../../pet/data/pet_repository.dart';
 import '../../pet/domain/pet_model.dart';
 import 'widgets/closet_bottom_sheet.dart';
 import 'widgets/feed_bottom_sheet.dart';
+import 'widgets/game_center_bottom_sheet.dart';
 import 'widgets/mailbox_bottom_sheet.dart';
 import 'widgets/pet_vital_bars.dart';
 import 'widgets/shop_bottom_sheet.dart';
@@ -368,7 +369,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     });
   }
 
-  Widget _buildPetMouth(PetModel pet, Size canvasSize) {
+  PetEmotion _resolvePetEmotion(PetModel pet) {
+    if (pet.isSleeping) return PetEmotion.sleeping;
+    if (_isChewing || _isFeedingMouthHovered) return PetEmotion.eating;
+    if (_isPetHappy) return PetEmotion.happy;
+    if (pet.hunger < 25) return PetEmotion.hungry;
+    if (pet.thirst < 25) return PetEmotion.thirsty;
+    if (pet.happiness < 30 || pet.energy < 20) return PetEmotion.sad;
+    return PetEmotion.neutral;
+  }
+
+  Widget _buildPetMouth(PetModel pet, Size canvasSize, PetEmotion emotion) {
     final mouthPoint = pet.eyesConfig.resolvedMouth;
     final mouthX = mouthPoint.x * canvasSize.width;
     final mouthY = mouthPoint.y * canvasSize.height;
@@ -379,8 +390,48 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       child: MouthWidget(
         size: 32,
         isOpen: _isFeedingMouthHovered || _isChewing,
+        emotion: emotion,
       ),
     );
+  }
+
+  List<Widget> _buildEquippedGarments(PetModel pet, Size canvasSize) {
+    final equippedIds = pet.resolvedEquippedGarmentIds;
+    if (equippedIds.isEmpty) {
+      if (pet.clothesImageUrl != null && pet.clothesImageUrl!.isNotEmpty) {
+        return [
+          GarabuImage(
+            imageUrl: pet.clothesImageUrl,
+            width: canvasSize.width,
+            height: canvasSize.height,
+            fit: BoxFit.contain,
+          ),
+        ];
+      }
+      return const [];
+    }
+
+    final widgets = <Widget>[];
+    for (final id in equippedIds) {
+      final garment = pet.closet.cast<GarmentItem?>().firstWhere(
+        (g) => g?.id == id,
+        orElse: () => null,
+      );
+      if (garment != null && garment.imageUrl.isNotEmpty) {
+        widgets.add(
+          Transform.translate(
+            offset: Offset(garment.offsetX, garment.offsetY),
+            child: GarabuImage(
+              imageUrl: garment.imageUrl,
+              width: canvasSize.width,
+              height: canvasSize.height,
+              fit: BoxFit.contain,
+            ),
+          ),
+        );
+      }
+    }
+    return widgets;
   }
 
   @override
@@ -426,6 +477,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                 final petBoxDimension = min(availableHeight, availableWidth).clamp(240.0, 420.0);
                 final canvasSize = Size(petBoxDimension, petBoxDimension);
 
+                final petEmotion = _resolvePetEmotion(pet);
+
                 // Widget de la mascota interactiva
                 final petContainerWidget = DragTarget<FruitInfo>(
                   onWillAcceptWithDetails: (details) {
@@ -439,196 +492,199 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                     _feedPetDirectly(pet, details.data);
                   },
                   builder: (context, candidateData, rejectedData) {
-                    return AnimatedBuilder(
-                      animation: Listenable.merge([
-                        _bounceAnimation,
-                        _squashController,
-                        _purrController,
-                      ]),
-                      builder: (context, child) {
-                        final bounce = pet.isSleeping ? 0.0 : _bounceAnimation.value;
-                        final purrScale = _purrScaleAnimation.value;
-                        final purrRot = _purrRotateAnimation.value;
-                        final squashX = _scaleXAnimation.value;
-                        final squashY = _scaleYAnimation.value;
-
-                        return Transform.translate(
-                          offset: Offset(0, bounce),
-                          child: Transform.rotate(
-                            angle: purrRot,
-                            child: Transform.scale(
-                              scaleX: squashX * purrScale,
-                              scaleY: squashY * purrScale,
-                              child: child,
-                            ),
-                          ),
-                        );
+                    return GestureDetector(
+                      onTapDown: (details) {
+                        if (_heldFruit != null) {
+                          _feedPetDirectly(pet, _heldFruit!);
+                        } else {
+                          _onPetStroke(pet, details.localPosition);
+                        }
                       },
-                      child: GestureDetector(
-                        onTapDown: (details) {
-                          if (_heldFruit != null) {
-                            _feedPetDirectly(pet, _heldFruit!);
-                          } else {
-                            _onPetStroke(pet, details.localPosition);
-                          }
-                        },
-                        onPanUpdate: (details) => _onPetStroke(pet, details.localPosition),
-                        child: Container(
-                          key: _petContainerKey,
-                          width: canvasSize.width,
-                          height: canvasSize.height,
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(28),
-                            border: Border.all(
-                              color: _isFeedingMouthHovered
-                                  ? GarabuTheme.primaryBrown
-                                  : GarabuTheme.warmSand,
-                              width: _isFeedingMouthHovered ? 2.8 : 1.5,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: _isFeedingMouthHovered
-                                    ? GarabuTheme.primaryBrown.withValues(alpha: 0.25)
-                                    : Colors.black.withValues(alpha: 0.06),
-                                blurRadius: _isFeedingMouthHovered ? 24 : 16,
-                                offset: const Offset(0, 8),
-                              ),
-                            ],
+                      onPanUpdate: (details) => _onPetStroke(pet, details.localPosition),
+                      child: Container(
+                        key: _petContainerKey,
+                        width: canvasSize.width,
+                        height: canvasSize.height,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          border: Border.all(
+                            color: _isFeedingMouthHovered
+                                ? GarabuTheme.primaryBrown
+                                : GarabuTheme.warmSand,
+                            width: _isFeedingMouthHovered ? 2.8 : 1.5,
                           ),
-                          clipBehavior: Clip.antiAlias,
-                          child: Stack(
-                            children: [
-                              // Fondo personalizado o cuaderno
-                              if (pet.backgroundUrl != null && pet.backgroundUrl!.isNotEmpty)
-                                GarabuImage(
-                                  imageUrl: pet.backgroundUrl,
-                                  width: canvasSize.width,
-                                  height: canvasSize.height,
-                                  fit: BoxFit.cover,
-                                )
-                              else
-                                const NotebookBackground(),
-
-                              // Modo Noche (Luz apagada)
-                              if (pet.isSleeping)
-                                Container(
-                                  color: const Color(0xCC101522),
-                                  width: canvasSize.width,
-                                  height: canvasSize.height,
-                                ),
-
-                              // Silueta / Cuerpo de la mascota
+                          boxShadow: [
+                            BoxShadow(
+                              color: _isFeedingMouthHovered
+                                  ? GarabuTheme.primaryBrown.withValues(alpha: 0.25)
+                                  : Colors.black.withValues(alpha: 0.06),
+                              blurRadius: _isFeedingMouthHovered ? 24 : 16,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: Stack(
+                          children: [
+                            // 1. Fondo estático (NO se mueve con la respiración/ronroneo del muñeco)
+                            if (pet.resolvedBackgroundUrl != null && pet.resolvedBackgroundUrl!.isNotEmpty)
                               GarabuImage(
-                                imageUrl: pet.bodyImageUrl,
+                                imageUrl: pet.resolvedBackgroundUrl,
                                 width: canvasSize.width,
                                 height: canvasSize.height,
-                                fit: BoxFit.contain,
+                                fit: BoxFit.cover,
+                              )
+                            else
+                              const NotebookBackground(),
+
+                            // 2. Modo Noche (Luz apagada) estático
+                            if (pet.isSleeping)
+                              Container(
+                                color: const Color(0xCC101522),
+                                width: canvasSize.width,
+                                height: canvasSize.height,
                               ),
 
-                              // Ojos sincronizados simultáneos
-                              AnimatedBuilder(
-                                animation: _blinkController,
-                                builder: (context, _) {
-                                  final double progress = pet.isSleeping ? 1.0 : _blinkController.value;
-                                  return Stack(
-                                    children: [
-                                      StaticEyeOverlay(
-                                        position: pet.eyesConfig.leftEye,
-                                        canvasSize: canvasSize,
-                                        color: Color(pet.eyesConfig.color),
-                                        hasEyelashes: pet.eyesConfig.hasEyelashes,
-                                        isLeft: true,
-                                        blinkProgress: progress,
-                                        isHappy: _isPetHappy,
-                                      ),
-                                      StaticEyeOverlay(
-                                        position: pet.eyesConfig.rightEye,
-                                        canvasSize: canvasSize,
-                                        color: Color(pet.eyesConfig.color),
-                                        hasEyelashes: pet.eyesConfig.hasEyelashes,
-                                        isLeft: false,
-                                        blinkProgress: progress,
-                                        isHappy: _isPetHappy,
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
+                            // 3. Capa animada exclusiva para el muñeco y su ropita anclada
+                            AnimatedBuilder(
+                              animation: Listenable.merge([
+                                _bounceAnimation,
+                                _squashController,
+                                _purrController,
+                              ]),
+                              builder: (context, child) {
+                                final bounce = pet.isSleeping ? 0.0 : _bounceAnimation.value;
+                                final purrScale = _purrScaleAnimation.value;
+                                final purrRot = _purrRotateAnimation.value;
+                                final squashX = _scaleXAnimation.value;
+                                final squashY = _scaleYAnimation.value;
 
-                              // Boca interactiva anclada
-                              _buildPetMouth(pet, canvasSize),
+                                return Transform.translate(
+                                  offset: Offset(0, bounce),
+                                  child: Transform.rotate(
+                                    angle: purrRot,
+                                    alignment: Alignment.bottomCenter,
+                                    child: Transform.scale(
+                                      scaleX: squashX * purrScale,
+                                      scaleY: squashY * purrScale,
+                                      alignment: Alignment.bottomCenter,
+                                      child: child,
+                                    ),
+                                  ),
+                                );
+                              },
+                              child: Stack(
+                                children: [
+                                  // Silueta / Cuerpo de la mascota
+                                  GarabuImage(
+                                    imageUrl: pet.bodyImageUrl,
+                                    width: canvasSize.width,
+                                    height: canvasSize.height,
+                                    fit: BoxFit.contain,
+                                  ),
 
-                              // Prenda activa del Clóset
-                              if (pet.clothesImageUrl != null && pet.clothesImageUrl!.isNotEmpty)
-                                GarabuImage(
-                                  imageUrl: pet.clothesImageUrl,
-                                  width: canvasSize.width,
-                                  height: canvasSize.height,
-                                  fit: BoxFit.contain,
-                                ),
-
-                              // Partículas de caricias aisladas en ValueListenableBuilder (cero rebuilds de la pantalla)
-                              ValueListenableBuilder<List<_SketchParticleData>>(
-                                valueListenable: _particlesNotifier,
-                                builder: (context, particles, _) {
-                                  return Stack(
-                                    children: particles.map((p) => _SketchParticleWidget(
-                                      key: p.key,
-                                      particle: p,
-                                      onDismissed: () {
-                                        final current = List<_SketchParticleData>.from(_particlesNotifier.value)
-                                          ..removeWhere((item) => item.key == p.key);
-                                        _particlesNotifier.value = current;
-                                      },
-                                    )).toList(),
-                                  );
-                                },
-                              ),
-
-                              // Globo de diálogo o Zzz si duerme
-                              if (_speechBubbleText != null || pet.isSleeping)
-                                Positioned(
-                                  top: 12,
-                                  left: 16,
-                                  right: 16,
-                                  child: Center(
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-                                      decoration: BoxDecoration(
-                                        color: pet.isSleeping
-                                            ? const Color(0xFF1E2638)
-                                            : Colors.white.withValues(alpha: 0.95),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: pet.isSleeping
-                                              ? const Color(0xFF5C6BC0)
-                                              : GarabuTheme.primaryBrown,
-                                          width: 1.5,
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withValues(alpha: 0.08),
-                                            blurRadius: 8,
-                                            offset: const Offset(0, 2),
+                                  // Ojos sincronizados simultáneos
+                                  AnimatedBuilder(
+                                    animation: _blinkController,
+                                    builder: (context, _) {
+                                      final double progress = pet.isSleeping ? 1.0 : _blinkController.value;
+                                      return Stack(
+                                        children: [
+                                          StaticEyeOverlay(
+                                            position: pet.eyesConfig.leftEye,
+                                            canvasSize: canvasSize,
+                                            color: Color(pet.eyesConfig.color),
+                                            hasEyelashes: pet.eyesConfig.hasEyelashes,
+                                            isLeft: true,
+                                            blinkProgress: progress,
+                                            isHappy: _isPetHappy,
+                                            emotion: petEmotion,
+                                          ),
+                                          StaticEyeOverlay(
+                                            position: pet.eyesConfig.rightEye,
+                                            canvasSize: canvasSize,
+                                            color: Color(pet.eyesConfig.color),
+                                            hasEyelashes: pet.eyesConfig.hasEyelashes,
+                                            isLeft: false,
+                                            blinkProgress: progress,
+                                            isHappy: _isPetHappy,
+                                            emotion: petEmotion,
                                           ),
                                         ],
+                                      );
+                                    },
+                                  ),
+
+                                  // Boca interactiva anclada
+                                  _buildPetMouth(pet, canvasSize, petEmotion),
+
+                                  // Prendas activas del Clóset (hasta 2 prendas con sus offsets)
+                                  ..._buildEquippedGarments(pet, canvasSize),
+                                ],
+                              ),
+                            ),
+
+                            // 4. Partículas de caricias aisladas en ValueListenableBuilder
+                            ValueListenableBuilder<List<_SketchParticleData>>(
+                              valueListenable: _particlesNotifier,
+                              builder: (context, particles, _) {
+                                return Stack(
+                                  children: particles.map((p) => _SketchParticleWidget(
+                                    key: p.key,
+                                    particle: p,
+                                    onDismissed: () {
+                                      final current = List<_SketchParticleData>.from(_particlesNotifier.value)
+                                        ..removeWhere((item) => item.key == p.key);
+                                      _particlesNotifier.value = current;
+                                    },
+                                  )).toList(),
+                                );
+                              },
+                            ),
+
+                            // 5. Globo de diálogo o Zzz si duerme
+                            if (_speechBubbleText != null || pet.isSleeping)
+                              Positioned(
+                                top: 12,
+                                left: 16,
+                                right: 16,
+                                child: Center(
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+                                    decoration: BoxDecoration(
+                                      color: pet.isSleeping
+                                          ? const Color(0xFF1E2638)
+                                          : Colors.white.withValues(alpha: 0.95),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: pet.isSleeping
+                                            ? const Color(0xFF5C6BC0)
+                                            : GarabuTheme.primaryBrown,
+                                        width: 1.5,
                                       ),
-                                      child: Text(
-                                        pet.isSleeping ? 'Zzz...' : _speechBubbleText!,
-                                        textAlign: TextAlign.center,
-                                        style: TextStyle(
-                                          fontSize: 12.5,
-                                          fontWeight: FontWeight.bold,
-                                          color: pet.isSleeping
-                                              ? const Color(0xFFC5CAE9)
-                                              : GarabuTheme.deepEspresso,
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withValues(alpha: 0.08),
+                                          blurRadius: 8,
+                                          offset: const Offset(0, 2),
                                         ),
+                                      ],
+                                    ),
+                                    child: Text(
+                                      pet.isSleeping ? 'Zzz...' : _speechBubbleText!,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        fontSize: 12.5,
+                                        fontWeight: FontWeight.bold,
+                                        color: pet.isSleeping
+                                            ? const Color(0xFFC5CAE9)
+                                            : GarabuTheme.deepEspresso,
                                       ),
                                     ),
                                   ),
                                 ),
-                            ],
-                          ),
+                              ),
+                          ],
                         ),
                       ),
                     );
@@ -878,6 +934,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                           builder: (_) => BackgroundCanvasScreen(pet: pet),
                                         ),
                                       ),
+                                    ),
+
+                                    // 6. Minijuegos en pareja
+                                    _buildDockButton(
+                                      icon: Icons.sports_esports_rounded,
+                                      label: 'Juegos',
+                                      onTap: () => GameCenterBottomSheet.show(context),
                                     ),
                                   ],
                                 ),

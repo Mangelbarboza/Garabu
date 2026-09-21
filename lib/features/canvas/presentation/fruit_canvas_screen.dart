@@ -1,11 +1,15 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/garabu_theme.dart';
+import '../../../core/utils/flood_fill.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/notebook_background.dart';
 import '../../pet/data/pet_repository.dart';
 import '../../pet/domain/pet_model.dart';
 import 'widgets/drawing_canvas.dart';
+import 'widgets/canvas_toolbar.dart';
 
 class FruitInfo {
   final String key;
@@ -45,15 +49,23 @@ class FruitCanvasScreen extends ConsumerStatefulWidget {
 class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
   DrawingCanvasController? _canvasController;
   CanvasTool _selectedTool = CanvasTool.pencil;
-  Color _selectedDrawColor = const Color(0xFFE53935); // Color por defecto según fruta
+  Color _selectedDrawColor = const Color(0xFFE53935);
+  double _selectedStrokeWidth = 4.0;
+  BucketPower _selectedBucketPower = BucketPower.medium;
+  Uint8List? _existingFruitBytes;
   bool _showStencil = true;
   bool _isExporting = false;
-
-  final List<Color> _paletteColors = GarabuTheme.canvasPalette;
 
   @override
   void initState() {
     super.initState();
+    // Si la fruta ya fue dibujada previamente, cargarla en el lienzo para EDITARLA
+    final existingUrl = widget.pet.drawnFruits[widget.fruit.key];
+    if (existingUrl != null && existingUrl.isNotEmpty) {
+      _existingFruitBytes = decodeDataUri(existingUrl);
+      _showStencil = false;
+    }
+
     // Seleccionar color inicial sugerido según la fruta elegida
     switch (widget.fruit.key) {
       case 'manzana':
@@ -227,6 +239,7 @@ class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
                       clipBehavior: Clip.antiAlias,
                       child: DrawingCanvas(
                         canvasSize: canvasSize,
+                        initialImageBytes: _existingFruitBytes,
                         onDrawingStarted: () {
                           // Ocultar la silueta sombra de la fruta apenas se comienza a dibujar
                           if (_showStencil) {
@@ -235,7 +248,13 @@ class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
                         },
                         onControllerReady: (c) {
                           _canvasController = c;
+                          if (_existingFruitBytes != null) {
+                            c.loadRasterImage(_existingFruitBytes!);
+                          }
                           _canvasController?.setColor(_selectedDrawColor);
+                        },
+                        onColorPicked: (color) {
+                          setState(() => _selectedDrawColor = color);
                         },
                         backgroundWidget: Stack(
                           children: [
@@ -254,134 +273,30 @@ class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
               ),
             ),
 
-            // Barra de Herramientas y Paleta
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Herramientas (Lápiz, Balde, Deshacer, Limpiar)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildToolButton(
-                        icon: Icons.edit_rounded,
-                        label: 'Lápiz',
-                        isSelected: _selectedTool == CanvasTool.pencil,
-                        onTap: () {
-                          setState(() => _selectedTool = CanvasTool.pencil);
-                          _canvasController?.setTool(CanvasTool.pencil);
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.format_color_fill_rounded,
-                        label: 'Relleno',
-                        isSelected: _selectedTool == CanvasTool.bucket,
-                        onTap: () {
-                          setState(() => _selectedTool = CanvasTool.bucket);
-                          _canvasController?.setTool(CanvasTool.bucket);
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.undo_rounded,
-                        label: 'Deshacer',
-                        isSelected: false,
-                        onTap: () => _canvasController?.undo(),
-                      ),
-                      _buildToolButton(
-                        icon: Icons.delete_outline_rounded,
-                        label: 'Limpiar',
-                        isSelected: false,
-                        onTap: () => _canvasController?.clear(),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 14, color: GarabuTheme.warmSand),
-
-                  // Paleta de Colores de 24 tonos
-                  SizedBox(
-                    height: 38,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _paletteColors.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final color = _paletteColors[index];
-                        final isSelected = _selectedDrawColor == color;
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedDrawColor = color);
-                            _canvasController?.setColor(color);
-                          },
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? GarabuTheme.primaryBrown
-                                    : GarabuTheme.warmSand,
-                                width: isSelected ? 2.5 : 1.2,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToolButton({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? GarabuTheme.warmSand.withValues(alpha: 0.5) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: GarabuTheme.primaryBrown) : null,
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.deepEspresso,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
-              ),
+            // Barra de herramientas completa
+            CanvasToolbar(
+              selectedTool: _selectedTool,
+              selectedColor: _selectedDrawColor,
+              selectedStrokeWidth: _selectedStrokeWidth,
+              selectedBucketPower: _selectedBucketPower,
+              onToolChanged: (tool) {
+                setState(() => _selectedTool = tool);
+                _canvasController?.setTool(tool);
+              },
+              onColorChanged: (color) {
+                setState(() => _selectedDrawColor = color);
+                _canvasController?.setColor(color);
+              },
+              onStrokeWidthChanged: (width) {
+                setState(() => _selectedStrokeWidth = width);
+                _canvasController?.setStrokeWidth(width);
+              },
+              onBucketPowerChanged: (power) {
+                setState(() => _selectedBucketPower = power);
+                _canvasController?.setBucketPower(power);
+              },
+              onUndo: () => _canvasController?.undo(),
+              onClear: () => _canvasController?.clear(),
             ),
           ],
         ),

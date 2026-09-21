@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/garabu_theme.dart';
+import '../../../core/utils/flood_fill.dart';
 import '../../../core/widgets/notebook_background.dart';
 import '../../dashboard/presentation/dashboard_screen.dart';
 import '../../lobby/data/lobby_repository.dart';
@@ -11,6 +12,7 @@ import '../../lobby/domain/couple_model.dart';
 import '../../pet/data/pet_repository.dart';
 import '../../pet/domain/pet_model.dart';
 import 'widgets/drawing_canvas.dart';
+import 'widgets/canvas_toolbar.dart';
 import 'widgets/eye_widget.dart';
 
 class BodyCanvasScreen extends ConsumerStatefulWidget {
@@ -33,6 +35,8 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
   DrawingCanvasController? _canvasController;
   CanvasTool _selectedTool = CanvasTool.pencil;
   Color _selectedDrawColor = const Color(0xFF2C2420);
+  double _selectedStrokeWidth = 4.0;
+  BucketPower _selectedBucketPower = BucketPower.medium;
   Uint8List? _existingBodyBytes;
 
   // Configuración de Ojos y Boca
@@ -44,8 +48,6 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
 
   bool _isExporting = false;
   bool _isWaitingClothes = false;
-
-  final List<Color> _paletteColors = GarabuTheme.canvasPalette;
 
   final List<Color> _eyePaletteColors = const [
     Color(0xFF2C2420), // Carbón / Negro suave
@@ -323,6 +325,9 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
                                 c.loadRasterImage(_existingBodyBytes!);
                               }
                             },
+                            onColorPicked: (color) {
+                              setState(() => _selectedDrawColor = color);
+                            },
                             backgroundWidget: const NotebookBackground(),
                             overlayWidget: Stack(
                               children: [
@@ -371,185 +376,78 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
               ),
             ),
 
-            // Panel de Herramientas y Controles
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+            // Barra de herramientas completa con controles de ojos en extraControls
+            CanvasToolbar(
+              selectedTool: _selectedTool,
+              selectedColor: _selectedDrawColor,
+              selectedStrokeWidth: _selectedStrokeWidth,
+              selectedBucketPower: _selectedBucketPower,
+              onToolChanged: (tool) {
+                setState(() => _selectedTool = tool);
+                _canvasController?.setTool(tool);
+              },
+              onColorChanged: (color) {
+                setState(() => _selectedDrawColor = color);
+                _canvasController?.setColor(color);
+              },
+              onStrokeWidthChanged: (width) {
+                setState(() => _selectedStrokeWidth = width);
+                _canvasController?.setStrokeWidth(width);
+              },
+              onBucketPowerChanged: (power) {
+                setState(() => _selectedBucketPower = power);
+                _canvasController?.setBucketPower(power);
+              },
+              onUndo: () => _canvasController?.undo(),
+              onClear: () => _canvasController?.clear(),
+              extraControls: Row(
                 children: [
-                  // Fila de Herramientas (Lápiz, Balde, Deshacer, Limpiar)
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildToolButton(
-                        icon: Icons.edit_rounded,
-                        label: 'Lápiz',
-                        isSelected: _selectedTool == CanvasTool.pencil,
-                        onTap: () {
-                          setState(() => _selectedTool = CanvasTool.pencil);
-                          _canvasController?.setTool(CanvasTool.pencil);
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.format_color_fill_rounded,
-                        label: 'Balde',
-                        isSelected: _selectedTool == CanvasTool.bucket,
-                        onTap: () {
-                          setState(() => _selectedTool = CanvasTool.bucket);
-                          _canvasController?.setTool(CanvasTool.bucket);
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.undo_rounded,
-                        label: 'Deshacer',
-                        isSelected: false,
-                        onTap: () => _canvasController?.undo(),
-                      ),
-                      _buildToolButton(
-                        icon: Icons.delete_outline_rounded,
-                        label: 'Limpiar',
-                        isSelected: false,
-                        onTap: () => _canvasController?.clear(),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 16, color: GarabuTheme.warmSand),
-
-                  // Paleta de Colores de Trazo y Relleno
-                  SizedBox(
-                    height: 36,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _paletteColors.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final color = _paletteColors[index];
-                        final isSelected = _selectedDrawColor == color;
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedDrawColor = color);
-                            _canvasController?.setColor(color);
-                          },
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? GarabuTheme.primaryBrown
-                                    : GarabuTheme.warmSand,
-                                width: isSelected ? 2.5 : 1.2,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
+                  const Text(
+                    'Ojos:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: GarabuTheme.deepEspresso,
                     ),
                   ),
-                  const SizedBox(height: 10),
-
-                  // Fila de Controles de Ojos (Color y Switch de Pestañas)
-                  Row(
-                    children: [
-                      const Text(
-                        'Ojos:',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: GarabuTheme.deepEspresso,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      // Mini selector de color de ojos
-                      ..._eyePaletteColors.map((c) {
-                        final isSelected = _selectedEyeColor == c;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6.0),
-                          child: GestureDetector(
-                            onTap: () => setState(() => _selectedEyeColor = c),
-                            child: Container(
-                              width: 22,
-                              height: 22,
-                              decoration: BoxDecoration(
-                                color: c,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: isSelected ? Colors.black : Colors.transparent,
-                                  width: 2,
-                                ),
-                              ),
+                  const SizedBox(width: 8),
+                  // Mini selector de color de ojos
+                  ..._eyePaletteColors.map((c) {
+                    final isSelected = _selectedEyeColor == c;
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 6.0),
+                      child: GestureDetector(
+                        onTap: () => setState(() => _selectedEyeColor = c),
+                        child: Container(
+                          width: 22,
+                          height: 22,
+                          decoration: BoxDecoration(
+                            color: c,
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: isSelected ? Colors.black : Colors.transparent,
+                              width: 2,
                             ),
                           ),
-                        );
-                      }),
-                      const Spacer(),
-                      // Switch de Pestañas
-                      const Text(
-                        'Pestañas',
-                        style: TextStyle(fontSize: 13, color: GarabuTheme.textSecondary),
-                      ),
-                      Transform.scale(
-                        scale: 0.8,
-                        child: Switch(
-                          value: _hasEyelashes,
-                          activeThumbColor: GarabuTheme.primaryBrown,
-                          onChanged: (val) => setState(() => _hasEyelashes = val),
                         ),
                       ),
-                    ],
+                    );
+                  }),
+                  const Spacer(),
+                  // Switch de Pestañas
+                  const Text(
+                    'Pestañas',
+                    style: TextStyle(fontSize: 13, color: GarabuTheme.textSecondary),
+                  ),
+                  Transform.scale(
+                    scale: 0.8,
+                    child: Switch(
+                      value: _hasEyelashes,
+                      activeThumbColor: GarabuTheme.primaryBrown,
+                      onChanged: (val) => setState(() => _hasEyelashes = val),
+                    ),
                   ),
                 ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildToolButton({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? GarabuTheme.warmSand.withValues(alpha: 0.5) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: GarabuTheme.primaryBrown) : null,
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.deepEspresso,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
               ),
             ),
           ],

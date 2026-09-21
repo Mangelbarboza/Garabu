@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
+import 'package:flutter/foundation.dart' show kIsWeb, debugPrint;
 import '../domain/user_model.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -30,37 +30,51 @@ class AuthRepository {
 
   AuthRepository()
       : _auth = Firebase.apps.isNotEmpty ? FirebaseAuth.instance : null,
-        _firestore = Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null {
-    if (_auth != null && _firestore != null) {
-      _auth!.authStateChanges().listen((User? user) async {
-        if (user == null) {
-          _controller.add(null);
-        } else {
-          final userDoc = await _firestore!.collection('users').doc(user.uid).get();
-          if (userDoc.exists && userDoc.data() != null) {
-            _controller.add(UserModel.fromMap(userDoc.data()!, user.uid));
-          } else {
-            final fallbackUser = UserModel(
-              id: user.uid,
-              name: (user.displayName != null && user.displayName!.isNotEmpty)
-                  ? user.displayName!
-                  : (user.email?.split('@').first ?? 'Usuario'),
-              email: user.email ?? '',
-              age: 18,
-              createdAt: DateTime.now(),
-            );
-            await _firestore!.collection('users').doc(user.uid).set(
-              fallbackUser.toMap(),
-              SetOptions(merge: true),
-            );
-            _controller.add(fallbackUser);
-          }
-        }
-      });
-    }
-  }
+        _firestore = Firebase.apps.isNotEmpty ? FirebaseFirestore.instance : null;
 
-  Stream<UserModel?> get authStateChanges => _controller.stream;
+  Stream<UserModel?> get authStateChanges {
+    if (_auth == null || _firestore == null) {
+      return _controller.stream;
+    }
+    return _auth!.authStateChanges().asyncMap((User? user) async {
+      if (user == null) {
+        _currentMockUser = null;
+        return null;
+      }
+      try {
+        final userDoc = await _firestore!.collection('users').doc(user.uid).get();
+        if (userDoc.exists && userDoc.data() != null) {
+          final model = UserModel.fromMap(userDoc.data()!, user.uid);
+          _currentMockUser = model;
+          return model;
+        }
+        final fallbackUser = UserModel(
+          id: user.uid,
+          name: (user.displayName != null && user.displayName!.isNotEmpty)
+              ? user.displayName!
+              : (user.email?.split('@').first ?? 'Usuario'),
+          email: user.email ?? '',
+          age: 18,
+          createdAt: DateTime.now(),
+        );
+        await _firestore!.collection('users').doc(user.uid).set(
+          fallbackUser.toMap(),
+          SetOptions(merge: true),
+        );
+        _currentMockUser = fallbackUser;
+        return fallbackUser;
+      } catch (e) {
+        debugPrint('Error obteniendo perfil: $e');
+        return UserModel(
+          id: user.uid,
+          name: user.displayName ?? 'Usuario',
+          email: user.email ?? '',
+          age: 18,
+          createdAt: DateTime.now(),
+        );
+      }
+    });
+  }
 
   UserModel? get currentUser {
     if (_auth != null && _auth!.currentUser != null) {

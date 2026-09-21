@@ -1,11 +1,17 @@
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show rootBundle;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/garabu_theme.dart';
+import '../../../core/utils/flood_fill.dart';
+import '../../../core/utils/image_utils.dart';
 import '../../../core/widgets/notebook_background.dart';
+import '../../dashboard/presentation/widgets/shop_bottom_sheet.dart' show kCatalogBackgrounds;
 import '../../pet/data/pet_repository.dart';
 import '../../pet/domain/pet_model.dart';
 import 'widgets/drawing_canvas.dart';
+import 'widgets/canvas_toolbar.dart';
 
 class BackgroundCanvasScreen extends ConsumerStatefulWidget {
   final PetModel pet;
@@ -23,9 +29,114 @@ class _BackgroundCanvasScreenState extends ConsumerState<BackgroundCanvasScreen>
   DrawingCanvasController? _canvasController;
   CanvasTool _selectedTool = CanvasTool.pencil;
   Color _selectedDrawColor = const Color(0xFFC19A6B);
+  double _selectedStrokeWidth = 4.0;
+  BucketPower _selectedBucketPower = BucketPower.medium;
+  int _selectedSlot = 0;
+  Uint8List? _initialSlotBytes;
   bool _isExporting = false;
 
-  final List<Color> _paletteColors = GarabuTheme.canvasPalette;
+  @override
+  void initState() {
+    super.initState();
+    _selectedSlot = widget.pet.activeBackgroundSlotIndex.clamp(0, 2);
+    _loadBytesForSlot(_selectedSlot);
+  }
+
+  Future<void> _loadBytesForSlot(int slotIndex) async {
+    String? url;
+    if (slotIndex < widget.pet.backgroundSlots.length) {
+      url = widget.pet.backgroundSlots[slotIndex];
+    }
+    url ??= (slotIndex == 0 ? widget.pet.backgroundUrl : null);
+
+    if (url != null && url.isNotEmpty) {
+      if (url.startsWith('assets/')) {
+        try {
+          final data = await rootBundle.load(url);
+          _initialSlotBytes = data.buffer.asUint8List();
+        } catch (_) {
+          _initialSlotBytes = null;
+        }
+      } else {
+        _initialSlotBytes = decodeDataUri(url);
+      }
+    } else {
+      _initialSlotBytes = null;
+    }
+  }
+
+  Future<void> _onSwitchSlot(int slotIndex) async {
+    if (_selectedSlot == slotIndex) return;
+    setState(() => _selectedSlot = slotIndex);
+    await _loadBytesForSlot(slotIndex);
+    if (mounted) {
+      if (_initialSlotBytes != null) {
+        _canvasController?.loadRasterImage(_initialSlotBytes!);
+      } else {
+        _canvasController?.clear();
+      }
+    }
+  }
+
+  Future<void> _showTemplatePicker() async {
+    final chosen = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GarabuTheme.paperWhite,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Text(
+          'Cargar Boceto Base',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: GarabuTheme.deepEspresso,
+          ),
+        ),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.separated(
+            shrinkWrap: true,
+            itemCount: kCatalogBackgrounds.length,
+            separatorBuilder: (_, __) => const Divider(height: 1),
+            itemBuilder: (ctx, i) {
+              final bg = kCatalogBackgrounds[i];
+              return ListTile(
+                leading: ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(bg.assetPath, width: 44, height: 44, fit: BoxFit.cover),
+                ),
+                title: Text(bg.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                subtitle: Text(bg.description, style: const TextStyle(fontSize: 11)),
+                onTap: () => Navigator.of(ctx).pop(bg.assetPath),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    if (chosen != null) {
+      try {
+        final data = await rootBundle.load(chosen);
+        final bytes = data.buffer.asUint8List();
+        _canvasController?.loadRasterImage(bytes);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('¡Boceto cargado en el lienzo! Ahora puedes colorearlo o personalizarlo.'),
+              backgroundColor: GarabuTheme.primaryBrown,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error al cargar boceto: $e')),
+          );
+        }
+      }
+    }
+  }
 
   Future<void> _saveBackground() async {
     if (_canvasController == null || _isExporting) return;
@@ -39,16 +150,17 @@ class _BackgroundCanvasScreenState extends ConsumerState<BackgroundCanvasScreen>
       }
 
       final petRepo = ref.read(petRepositoryProvider);
-      await petRepo.updateBackground(
+      await petRepo.updateBackgroundSlot(
         petId: widget.pet.id,
         coupleId: widget.pet.coupleId,
+        slotIndex: _selectedSlot,
         backgroundBytes: bgBytes,
       );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('¡Fondo actualizado con éxito!'),
+          SnackBar(
+            content: Text('¡Fondo guardado en Slot #${_selectedSlot + 1} con éxito!'),
             backgroundColor: GarabuTheme.primaryBrown,
           ),
         );
@@ -67,26 +179,27 @@ class _BackgroundCanvasScreenState extends ConsumerState<BackgroundCanvasScreen>
 
   Future<void> _resetToNotebook() async {
     final petRepo = ref.read(petRepositoryProvider);
-    await petRepo.updateBackground(
+    await petRepo.updateBackgroundSlot(
       petId: widget.pet.id,
       coupleId: widget.pet.coupleId,
+      slotIndex: _selectedSlot,
       backgroundBytes: null,
     );
+    _canvasController?.clear();
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Restaurado al fondo clásico de cuaderno'),
+        SnackBar(
+          content: Text('Slot #${_selectedSlot + 1} restaurado a cuaderno'),
           backgroundColor: GarabuTheme.primaryBrown,
         ),
       );
-      Navigator.of(context).pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
-    final availableHeight = size.height - 280.0;
+    final availableHeight = size.height - 300.0;
     final availableWidth = size.width - 32.0;
     final canvasDimension = min(availableHeight, availableWidth).clamp(220.0, 440.0);
     final canvasSize = Size(canvasDimension, canvasDimension);
@@ -94,10 +207,15 @@ class _BackgroundCanvasScreenState extends ConsumerState<BackgroundCanvasScreen>
     return Scaffold(
       backgroundColor: GarabuTheme.background,
       appBar: AppBar(
-        title: const Text('Dibuja un Fondo'),
+        title: const Text('Fondos (3 Slots)'),
         actions: [
           IconButton(
-            tooltip: 'Usar fondo clásico',
+            tooltip: 'Cargar boceto base',
+            icon: const Icon(Icons.collections_bookmark_rounded, color: GarabuTheme.primaryBrown),
+            onPressed: _showTemplatePicker,
+          ),
+          IconButton(
+            tooltip: 'Restaurar slot a cuaderno blanco',
             icon: const Icon(Icons.restart_alt_rounded, color: GarabuTheme.textSecondary),
             onPressed: _resetToNotebook,
           ),
@@ -127,20 +245,56 @@ class _BackgroundCanvasScreenState extends ConsumerState<BackgroundCanvasScreen>
       body: SafeArea(
         child: Column(
           children: [
+            // Selector de los 3 Slots de Fondo
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: GarabuTheme.paperWhite,
-              child: const Text(
-                'Dibuja una habitación, paisaje o decoración que se verá detrás de su mascota',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: GarabuTheme.deepEspresso,
-                ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'Slot de Fondo:',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.bold,
+                      color: GarabuTheme.deepEspresso,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  for (int i = 0; i < 3; i++) ...[
+                    GestureDetector(
+                      onTap: () => _onSwitchSlot(i),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        decoration: BoxDecoration(
+                          color: _selectedSlot == i
+                              ? GarabuTheme.primaryBrown
+                              : GarabuTheme.warmSand.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: _selectedSlot == i
+                                ? GarabuTheme.primaryBrown
+                                : GarabuTheme.warmSand,
+                          ),
+                        ),
+                        child: Text(
+                          'Slot ${i + 1}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _selectedSlot == i ? Colors.white : GarabuTheme.deepEspresso,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
+
+            // Canvas de Fondo
             Expanded(
               child: Center(
                 child: SingleChildScrollView(
@@ -163,9 +317,16 @@ class _BackgroundCanvasScreenState extends ConsumerState<BackgroundCanvasScreen>
                       clipBehavior: Clip.antiAlias,
                       child: DrawingCanvas(
                         canvasSize: canvasSize,
+                        initialImageBytes: _initialSlotBytes,
                         onControllerReady: (c) {
                           _canvasController = c;
+                          if (_initialSlotBytes != null) {
+                            c.loadRasterImage(_initialSlotBytes!);
+                          }
                           _canvasController?.setColor(_selectedDrawColor);
+                        },
+                        onColorPicked: (color) {
+                          setState(() => _selectedDrawColor = color);
                         },
                         backgroundWidget: const NotebookBackground(),
                       ),
@@ -174,130 +335,31 @@ class _BackgroundCanvasScreenState extends ConsumerState<BackgroundCanvasScreen>
                 ),
               ),
             ),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.04),
-                    blurRadius: 8,
-                    offset: const Offset(0, -2),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _buildToolButton(
-                        icon: Icons.edit_rounded,
-                        label: 'Lápiz',
-                        isSelected: _selectedTool == CanvasTool.pencil,
-                        onTap: () {
-                          setState(() => _selectedTool = CanvasTool.pencil);
-                          _canvasController?.setTool(CanvasTool.pencil);
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.format_color_fill_rounded,
-                        label: 'Relleno',
-                        isSelected: _selectedTool == CanvasTool.bucket,
-                        onTap: () {
-                          setState(() => _selectedTool = CanvasTool.bucket);
-                          _canvasController?.setTool(CanvasTool.bucket);
-                        },
-                      ),
-                      _buildToolButton(
-                        icon: Icons.undo_rounded,
-                        label: 'Deshacer',
-                        isSelected: false,
-                        onTap: () => _canvasController?.undo(),
-                      ),
-                      _buildToolButton(
-                        icon: Icons.delete_outline_rounded,
-                        label: 'Limpiar',
-                        isSelected: false,
-                        onTap: () => _canvasController?.clear(),
-                      ),
-                    ],
-                  ),
-                  const Divider(height: 14, color: GarabuTheme.warmSand),
-                  SizedBox(
-                    height: 38,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _paletteColors.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, index) {
-                        final color = _paletteColors[index];
-                        final isSelected = _selectedDrawColor == color;
-                        return GestureDetector(
-                          onTap: () {
-                            setState(() => _selectedDrawColor = color);
-                            _canvasController?.setColor(color);
-                          },
-                          child: Container(
-                            width: 32,
-                            height: 32,
-                            decoration: BoxDecoration(
-                              color: color,
-                              shape: BoxShape.circle,
-                              border: Border.all(
-                                color: isSelected
-                                    ? GarabuTheme.primaryBrown
-                                    : GarabuTheme.warmSand,
-                                width: isSelected ? 2.5 : 1.2,
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
 
-  Widget _buildToolButton({
-    required IconData icon,
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: isSelected ? GarabuTheme.warmSand.withValues(alpha: 0.5) : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
-          border: isSelected ? Border.all(color: GarabuTheme.primaryBrown) : null,
-        ),
-        child: Column(
-          children: [
-            Icon(
-              icon,
-              size: 20,
-              color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.deepEspresso,
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
-              ),
+            // Barra de herramientas completa
+            CanvasToolbar(
+              selectedTool: _selectedTool,
+              selectedColor: _selectedDrawColor,
+              selectedStrokeWidth: _selectedStrokeWidth,
+              selectedBucketPower: _selectedBucketPower,
+              onToolChanged: (tool) {
+                setState(() => _selectedTool = tool);
+                _canvasController?.setTool(tool);
+              },
+              onColorChanged: (color) {
+                setState(() => _selectedDrawColor = color);
+                _canvasController?.setColor(color);
+              },
+              onStrokeWidthChanged: (width) {
+                setState(() => _selectedStrokeWidth = width);
+                _canvasController?.setStrokeWidth(width);
+              },
+              onBucketPowerChanged: (power) {
+                setState(() => _selectedBucketPower = power);
+                _canvasController?.setBucketPower(power);
+              },
+              onUndo: () => _canvasController?.undo(),
+              onClear: () => _canvasController?.clear(),
             ),
           ],
         ),

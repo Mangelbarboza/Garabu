@@ -4,7 +4,9 @@ import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import '../../../../core/utils/flood_fill.dart';
 
-enum CanvasTool { pencil, bucket }
+enum CanvasTool { pencil, bucket, eyedropper }
+
+const List<double> kPencilStrokeWidths = [2.0, 4.0, 8.0, 14.0, 24.0];
 
 class DrawnLine {
   final List<Offset> points;
@@ -24,6 +26,7 @@ class DrawingCanvas extends StatefulWidget {
   final Widget? overlayWidget;
   final Uint8List? initialImageBytes;
   final VoidCallback? onDrawingStarted;
+  final void Function(Color color)? onColorPicked;
   final void Function(DrawingCanvasController controller)? onControllerReady;
 
   const DrawingCanvas({
@@ -33,6 +36,7 @@ class DrawingCanvas extends StatefulWidget {
     this.overlayWidget,
     this.initialImageBytes,
     this.onDrawingStarted,
+    this.onColorPicked,
     this.onControllerReady,
   });
 
@@ -47,9 +51,15 @@ class DrawingCanvasController {
   void setTool(CanvasTool tool) => _state.setTool(tool);
   void setColor(Color color) => _state.setColor(color);
   void setStrokeWidth(double width) => _state.setStrokeWidth(width);
+  void setBucketPower(BucketPower power) => _state.setBucketPower(power);
   void undo() => _state.undo();
   void clear() => _state.clear();
   Future<void> loadRasterImage(Uint8List pngBytes) => _state.loadRasterImage(pngBytes);
+
+  Color get currentColor => _state.currentColor;
+  double get currentStrokeWidth => _state.currentStrokeWidth;
+  CanvasTool get currentTool => _state.currentTool;
+  BucketPower get bucketPower => _state.bucketPower;
 
   Future<Uint8List?> exportTransparentPng() => _state.exportTransparentPng();
 }
@@ -58,11 +68,17 @@ class DrawingCanvasState extends State<DrawingCanvas> {
   CanvasTool _currentTool = CanvasTool.pencil;
   Color _currentColor = const Color(0xFF2C2420);
   double _currentStrokeWidth = 4.0;
+  BucketPower _bucketPower = BucketPower.medium;
 
   final List<DrawnLine> _lines = [];
   DrawnLine? _activeLine;
-  ui.Image? _rasterLayer; // Capa de píxeles generada por el balde de pintura o dibujo existente
+  ui.Image? _rasterLayer; // Capa ráster generada por balde de pintura o dibujo existente
   final List<ui.Image?> _rasterHistory = [];
+
+  Color get currentColor => _currentColor;
+  double get currentStrokeWidth => _currentStrokeWidth;
+  CanvasTool get currentTool => _currentTool;
+  BucketPower get bucketPower => _bucketPower;
 
   @override
   void initState() {
@@ -113,6 +129,12 @@ class DrawingCanvasState extends State<DrawingCanvas> {
     });
   }
 
+  void setBucketPower(BucketPower power) {
+    setState(() {
+      _bucketPower = power;
+    });
+  }
+
   void undo() {
     setState(() {
       if (_lines.isNotEmpty) {
@@ -132,12 +154,64 @@ class DrawingCanvasState extends State<DrawingCanvas> {
     });
   }
 
+  Future<void> _handleEyedropperTap(Offset tapPosition) async {
+    final w = widget.canvasSize.width.toInt();
+    final h = widget.canvasSize.height.toInt();
+    if (w <= 0 || h <= 0) return;
+
+    final x = tapPosition.dx.toInt().clamp(0, w - 1);
+    final y = tapPosition.dy.toInt().clamp(0, h - 1);
+
+    final recorder = ui.PictureRecorder();
+    final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()));
+
+    if (_rasterLayer != null) {
+      canvas.drawImage(_rasterLayer!, Offset.zero, Paint());
+    }
+
+    for (final line in _lines) {
+      final paint = Paint()
+        ..color = line.color
+        ..strokeCap = StrokeCap.round
+        ..strokeJoin = StrokeJoin.round
+        ..strokeWidth = line.strokeWidth
+        ..style = PaintingStyle.stroke;
+
+      for (int i = 0; i < line.points.length - 1; i++) {
+        canvas.drawLine(line.points[i], line.points[i + 1], paint);
+      }
+    }
+
+    final picture = recorder.endRecording();
+    final img = await picture.toImage(w, h);
+    final byteData = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (byteData == null) return;
+
+    final offset = (y * w + x) * 4;
+    final r = byteData.getUint8(offset);
+    final g = byteData.getUint8(offset + 1);
+    final b = byteData.getUint8(offset + 2);
+    final a = byteData.getUint8(offset + 3);
+
+    // Si el pixel es transparente, ignorar o tomar marrón oscuro por defecto
+    if (a < 15) return;
+
+    final pickedColor = Color.fromARGB(255, r, g, b);
+
+    setState(() {
+      _currentColor = pickedColor;
+      _currentTool = CanvasTool.pencil; // Vuelve automáticamente al lápiz
+    });
+
+    widget.onColorPicked?.call(pickedColor);
+  }
+
   Future<void> _handleFloodFillTap(Offset tapPosition) async {
     final w = widget.canvasSize.width.toInt();
     final h = widget.canvasSize.height.toInt();
     if (w <= 0 || h <= 0) return;
 
-    // 1. Snapshot del lienzo actual a imagen
+    // Snapshot del lienzo actual a imagen
     final recorder = ui.PictureRecorder();
     final canvas = Canvas(recorder, Rect.fromLTWH(0, 0, w.toDouble(), h.toDouble()));
 
@@ -179,7 +253,7 @@ class DrawingCanvasState extends State<DrawingCanvas> {
       startX: tapPosition.dx.toInt().clamp(0, w - 1),
       startY: tapPosition.dy.toInt().clamp(0, h - 1),
       fillColor: fillRgba,
-      tolerance: 35,
+      power: _bucketPower,
     );
 
     if (filled) {
@@ -196,7 +270,7 @@ class DrawingCanvasState extends State<DrawingCanvas> {
       setState(() {
         _rasterHistory.add(_rasterLayer);
         _rasterLayer = newImage;
-        _lines.clear(); // Los trazos anteriores quedan consolidados en la capa raster
+        _lines.clear(); // Los trazos anteriores quedan consolidados en la capa ráster
       });
     }
   }
@@ -258,6 +332,8 @@ class DrawingCanvasState extends State<DrawingCanvas> {
                 });
               } else if (_currentTool == CanvasTool.bucket) {
                 _handleFloodFillTap(details.localPosition);
+              } else if (_currentTool == CanvasTool.eyedropper) {
+                _handleEyedropperTap(details.localPosition);
               }
             },
             onPanUpdate: (details) {
@@ -276,6 +352,8 @@ class DrawingCanvasState extends State<DrawingCanvas> {
               widget.onDrawingStarted?.call();
               if (_currentTool == CanvasTool.bucket) {
                 _handleFloodFillTap(details.localPosition);
+              } else if (_currentTool == CanvasTool.eyedropper) {
+                _handleEyedropperTap(details.localPosition);
               }
             },
             child: CustomPaint(
