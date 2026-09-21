@@ -24,20 +24,31 @@ class RelativePoint {
 class EyesConfig {
   final RelativePoint leftEye;
   final RelativePoint rightEye;
+  final RelativePoint? mouth;
   final int color;
   final bool hasEyelashes;
 
   const EyesConfig({
     required this.leftEye,
     required this.rightEye,
+    this.mouth,
     this.color = 0xFF2C2420,
     this.hasEyelashes = false,
   });
+
+  RelativePoint get resolvedMouth {
+    if (mouth != null) return mouth!;
+    final midX = (leftEye.x + rightEye.x) / 2.0;
+    final maxY = leftEye.y > rightEye.y ? leftEye.y : rightEye.y;
+    final mouthY = (maxY + 0.08).clamp(0.0, 1.0);
+    return RelativePoint(x: midX, y: mouthY);
+  }
 
   Map<String, dynamic> toMap() {
     return {
       'leftEye': leftEye.toMap(),
       'rightEye': rightEye.toMap(),
+      'mouth': mouth?.toMap(),
       'color': color,
       'hasEyelashes': hasEyelashes,
     };
@@ -51,6 +62,9 @@ class EyesConfig {
       rightEye: RelativePoint.fromMap(
         map['rightEye'] is Map<String, dynamic> ? map['rightEye'] : {},
       ),
+      mouth: map['mouth'] is Map<String, dynamic>
+          ? RelativePoint.fromMap(map['mouth'] as Map<String, dynamic>)
+          : null,
       color: (map['color'] as num?)?.toInt() ?? 0xFF2C2420,
       hasEyelashes: map['hasEyelashes'] as bool? ?? false,
     );
@@ -59,12 +73,14 @@ class EyesConfig {
   EyesConfig copyWith({
     RelativePoint? leftEye,
     RelativePoint? rightEye,
+    RelativePoint? mouth,
     int? color,
     bool? hasEyelashes,
   }) {
     return EyesConfig(
       leftEye: leftEye ?? this.leftEye,
       rightEye: rightEye ?? this.rightEye,
+      mouth: mouth ?? this.mouth,
       color: color ?? this.color,
       hasEyelashes: hasEyelashes ?? this.hasEyelashes,
     );
@@ -136,8 +152,10 @@ class PetModel {
   final List<GarmentItem> closet;
   final String? activeGarmentId;
   final Map<String, String> drawnFruits;
+  final Map<String, int> foodInventory;
   final DateTime? lastFedAt;
   final DateTime? lastWateredAt;
+  final DateTime? lastPettedAt;
   final bool isSleeping;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -153,8 +171,10 @@ class PetModel {
     this.closet = const [],
     this.activeGarmentId,
     this.drawnFruits = const {},
+    this.foodInventory = const {},
     this.lastFedAt,
     this.lastWateredAt,
+    this.lastPettedAt,
     this.isSleeping = false,
     required this.createdAt,
     required this.updatedAt,
@@ -172,8 +192,10 @@ class PetModel {
       'closet': closet.map((g) => g.toMap()).toList(),
       'activeGarmentId': activeGarmentId,
       'drawnFruits': drawnFruits,
+      'foodInventory': foodInventory,
       'lastFedAt': lastFedAt?.toIso8601String(),
       'lastWateredAt': lastWateredAt?.toIso8601String(),
+      'lastPettedAt': lastPettedAt?.toIso8601String(),
       'isSleeping': isSleeping,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -207,6 +229,11 @@ class PetModel {
         ) ??
         {};
 
+    final rawInventory = (map['foodInventory'] as Map<String, dynamic>?)?.map(
+          (key, value) => MapEntry(key, (value as num?)?.toInt() ?? 0),
+        ) ??
+        {};
+
     return PetModel(
       id: docId,
       coupleId: map['coupleId'] ?? '',
@@ -220,11 +247,15 @@ class PetModel {
       closet: resolvedCloset,
       activeGarmentId: resolvedActiveGarmentId,
       drawnFruits: rawFruits,
+      foodInventory: rawInventory,
       lastFedAt: map['lastFedAt'] != null
           ? DateTime.tryParse(map['lastFedAt'])
           : null,
       lastWateredAt: map['lastWateredAt'] != null
           ? DateTime.tryParse(map['lastWateredAt'])
+          : null,
+      lastPettedAt: map['lastPettedAt'] != null
+          ? DateTime.tryParse(map['lastPettedAt'])
           : null,
       isSleeping: map['isSleeping'] as bool? ?? false,
       createdAt: map['createdAt'] != null
@@ -247,8 +278,10 @@ class PetModel {
     List<GarmentItem>? closet,
     String? activeGarmentId,
     Map<String, String>? drawnFruits,
+    Map<String, int>? foodInventory,
     DateTime? lastFedAt,
     DateTime? lastWateredAt,
+    DateTime? lastPettedAt,
     bool? isSleeping,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -264,8 +297,10 @@ class PetModel {
       closet: closet ?? this.closet,
       activeGarmentId: activeGarmentId ?? this.activeGarmentId,
       drawnFruits: drawnFruits ?? this.drawnFruits,
+      foodInventory: foodInventory ?? this.foodInventory,
       lastFedAt: lastFedAt ?? this.lastFedAt,
       lastWateredAt: lastWateredAt ?? this.lastWateredAt,
+      lastPettedAt: lastPettedAt ?? this.lastPettedAt,
       isSleeping: isSleeping ?? this.isSleeping,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

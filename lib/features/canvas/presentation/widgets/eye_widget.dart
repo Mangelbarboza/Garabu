@@ -383,3 +383,165 @@ class _BlinkingEyeOverlayState extends State<BlinkingEyeOverlay>
     );
   }
 }
+
+class MouthWidget extends StatelessWidget {
+  final double size;
+  final bool isOpen;
+
+  const MouthWidget({
+    super.key,
+    this.size = 24.0,
+    this.isOpen = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size * 0.6,
+      child: CustomPaint(
+        painter: _MouthSmilePainter(isOpen: isOpen),
+      ),
+    );
+  }
+}
+
+class _MouthSmilePainter extends CustomPainter {
+  final bool isOpen;
+
+  _MouthSmilePainter({this.isOpen = false});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = const Color(0xFF2C2420)
+      ..strokeWidth = 2.4
+      ..strokeCap = StrokeCap.round
+      ..style = isOpen ? PaintingStyle.fill : PaintingStyle.stroke;
+
+    final path = Path();
+    if (isOpen) {
+      path.moveTo(size.width * 0.1, size.height * 0.2);
+      path.quadraticBezierTo(
+        size.width * 0.5,
+        size.height * 1.1,
+        size.width * 0.9,
+        size.height * 0.2,
+      );
+      path.close();
+      canvas.drawPath(path, paint);
+
+      final tonguePaint = Paint()
+        ..color = const Color(0xFFFF8B94)
+        ..style = PaintingStyle.fill;
+      final tonguePath = Path();
+      tonguePath.moveTo(size.width * 0.3, size.height * 0.55);
+      tonguePath.quadraticBezierTo(
+        size.width * 0.5,
+        size.height * 1.05,
+        size.width * 0.7,
+        size.height * 0.55,
+      );
+      tonguePath.close();
+      canvas.drawPath(tonguePath, tonguePaint);
+    } else {
+      path.moveTo(size.width * 0.15, size.height * 0.3);
+      path.quadraticBezierTo(
+        size.width * 0.5,
+        size.height * 0.9,
+        size.width * 0.85,
+        size.height * 0.3,
+      );
+      canvas.drawPath(path, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _MouthSmilePainter oldDelegate) =>
+      oldDelegate.isOpen != isOpen;
+}
+
+/// Widget para posicionar y arrastrar la boca sobre el canvas interactivo
+class DraggableMouth extends StatelessWidget {
+  final RelativePoint position;
+  final Size canvasSize;
+  final ValueChanged<RelativePoint> onPositionChanged;
+
+  const DraggableMouth({
+    super.key,
+    required this.position,
+    required this.canvasSize,
+    required this.onPositionChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const mouthWidth = 36.0;
+    const mouthHeight = 24.0;
+    final pixelX = (position.x * canvasSize.width) - (mouthWidth / 2);
+    final pixelY = (position.y * canvasSize.height) - (mouthHeight / 2);
+
+    return Positioned(
+      left: pixelX,
+      top: pixelY,
+      child: GestureDetector(
+        onPanUpdate: (details) {
+          final newPixelX = pixelX + details.delta.dx + (mouthWidth / 2);
+          final newPixelY = pixelY + details.delta.dy + (mouthHeight / 2);
+
+          final clampedX = (newPixelX / canvasSize.width).clamp(0.08, 0.92);
+          final clampedY = (newPixelY / canvasSize.height).clamp(0.08, 0.92);
+
+          onPositionChanged(RelativePoint(x: clampedX, y: clampedY));
+        },
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.85),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: Colors.brown.withValues(alpha: 0.4), width: 1.5),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 4,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: const MouthWidget(size: 24.0),
+        ),
+      ),
+    );
+  }
+}
+
+/// Widget para renderizar la boca estática o animada
+class StaticMouthOverlay extends StatelessWidget {
+  final RelativePoint position;
+  final Size canvasSize;
+  final double size;
+  final bool isOpen;
+
+  const StaticMouthOverlay({
+    super.key,
+    required this.position,
+    required this.canvasSize,
+    this.size = 28.0,
+    this.isOpen = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pixelX = (position.x * canvasSize.width) - (size / 2);
+    final pixelY = (position.y * canvasSize.height) - (size * 0.3);
+
+    return Positioned(
+      left: pixelX,
+      top: pixelY,
+      child: MouthWidget(
+        size: size,
+        isOpen: isOpen,
+      ),
+    );
+  }
+}

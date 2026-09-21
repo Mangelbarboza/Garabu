@@ -3,6 +3,7 @@ import '../../../../core/theme/garabu_theme.dart';
 import '../../../../core/widgets/garabu_image.dart';
 import '../../../canvas/presentation/fruit_canvas_screen.dart';
 import '../../../pet/domain/pet_model.dart';
+import 'shop_bottom_sheet.dart';
 
 class FeedBottomSheet extends StatelessWidget {
   final PetModel pet;
@@ -37,6 +38,7 @@ class FeedBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final drawnFruits = pet.drawnFruits;
+    final inventory = pet.foodInventory;
 
     return Container(
       decoration: const BoxDecoration(
@@ -83,7 +85,7 @@ class FeedBottomSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    'Dibuja cada fruta para poder usarla como comida',
+                    'Arrastra la comida a la boca de tu mascota',
                     style: TextStyle(
                       fontSize: 13,
                       color: GarabuTheme.textSecondary,
@@ -91,26 +93,15 @@ class FeedBottomSheet extends StatelessWidget {
                   ),
                 ],
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: GarabuTheme.warmSand.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  '${drawnFruits.length}/${kAvailableFruits.length} frutas',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: GarabuTheme.deepEspresso,
-                  ),
-                ),
+              IconButton(
+                icon: const Icon(Icons.close_rounded, color: GarabuTheme.textSecondary),
+                onPressed: () => Navigator.of(context).pop(),
               ),
             ],
           ),
           const SizedBox(height: 14),
 
-          // Tarjeta de Acción Rápida: Dar Agua Fresca (Sed)
+          // Tarjeta de Acción: Dar Agua Fresca (Sed) - SIN EMOJIS
           InkWell(
             onTap: () {
               Navigator.of(context).pop();
@@ -136,7 +127,11 @@ class FeedBottomSheet extends StatelessWidget {
                       shape: BoxShape.circle,
                     ),
                     child: const Center(
-                      child: Text('💧', style: TextStyle(fontSize: 20)),
+                      child: Icon(
+                        Icons.water_drop_rounded,
+                        color: Color(0xFF0288D1),
+                        size: 22,
+                      ),
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -184,31 +179,39 @@ class FeedBottomSheet extends StatelessWidget {
               final fruit = kAvailableFruits[index];
               final isDrawn = drawnFruits.containsKey(fruit.key);
               final imageUrl = drawnFruits[fruit.key];
+              final count = inventory[fruit.key] ?? 0;
+              final canFeed = isDrawn && count > 0;
 
               return InkWell(
                 onTap: () {
-                  if (isDrawn) {
+                  if (canFeed) {
                     Navigator.of(context).pop();
                     if (onFruitFed != null) {
                       onFruitFed!(fruit);
                     }
-                  } else {
+                  } else if (!isDrawn) {
                     Navigator.of(context).pop();
                     Navigator.of(context).push(
                       MaterialPageRoute(
                         builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
                       ),
                     );
+                  } else {
+                    // Está agotada, sugerir comprar en tienda
+                    Navigator.of(context).pop();
+                    ShopBottomSheet.show(context: context, pet: pet);
                   }
                 },
                 borderRadius: BorderRadius.circular(16),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: isDrawn ? GarabuTheme.paperWhite : Colors.white,
+                    color: canFeed
+                        ? GarabuTheme.paperWhite
+                        : GarabuTheme.paperWhite.withValues(alpha: 0.6),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isDrawn ? GarabuTheme.primaryBrown : GarabuTheme.warmSand,
-                      width: isDrawn ? 1.8 : 1.0,
+                      color: canFeed ? GarabuTheme.primaryBrown : GarabuTheme.warmSand,
+                      width: canFeed ? 1.8 : 1.0,
                     ),
                     boxShadow: [
                       BoxShadow(
@@ -224,7 +227,7 @@ class FeedBottomSheet extends StatelessWidget {
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Imagen dibujada o Emoji bloqueado
+                            // Vista previa de imagen dibujada o círculo de color de la fruta
                             Container(
                               width: 52,
                               height: 52,
@@ -232,7 +235,7 @@ class FeedBottomSheet extends StatelessWidget {
                                 shape: BoxShape.circle,
                                 color: isDrawn
                                     ? Colors.white
-                                    : GarabuTheme.warmSand.withValues(alpha: 0.3),
+                                    : fruit.color.withValues(alpha: 0.2),
                               ),
                               clipBehavior: Clip.antiAlias,
                               child: Center(
@@ -244,12 +247,10 @@ class FeedBottomSheet extends StatelessWidget {
                                           fit: BoxFit.contain,
                                         ),
                                       )
-                                    : Text(
-                                        fruit.emoji,
-                                        style: TextStyle(
-                                          fontSize: 28,
-                                          color: Colors.grey.withValues(alpha: 0.6),
-                                        ),
+                                    : Icon(
+                                        Icons.brush_rounded,
+                                        color: fruit.color,
+                                        size: 24,
                                       ),
                               ),
                             ),
@@ -270,17 +271,25 @@ class FeedBottomSheet extends StatelessWidget {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                               decoration: BoxDecoration(
-                                color: isDrawn
+                                color: canFeed
                                     ? const Color(0xFFE8F5E9)
-                                    : GarabuTheme.warmSand.withValues(alpha: 0.5),
+                                    : (!isDrawn
+                                        ? GarabuTheme.warmSand.withValues(alpha: 0.5)
+                                        : const Color(0xFFFFEBEE)),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                isDrawn ? 'Alimentar' : 'Dibujar',
+                                canFeed
+                                    ? 'Dar (x$count)'
+                                    : (!isDrawn ? 'Dibujar' : 'Agotada'),
                                 style: TextStyle(
                                   fontSize: 10,
                                   fontWeight: FontWeight.bold,
-                                  color: isDrawn ? const Color(0xFF2E7D32) : GarabuTheme.textSecondary,
+                                  color: canFeed
+                                      ? const Color(0xFF2E7D32)
+                                      : (!isDrawn
+                                          ? GarabuTheme.textSecondary
+                                          : const Color(0xFFC62828)),
                                 ),
                               ),
                             ),
@@ -288,34 +297,23 @@ class FeedBottomSheet extends StatelessWidget {
                         ),
                       ),
 
-                      // Botón para editar la fruta dibujada
-                      if (isDrawn)
+                      // Contador badge si tiene existencias
+                      if (count > 0)
                         Positioned(
-                          top: 6,
-                          right: 6,
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              onTap: () {
-                                Navigator.of(context).pop();
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
-                                  ),
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(12),
-                              child: Container(
-                                padding: const EdgeInsets.all(5),
-                                decoration: BoxDecoration(
-                                  color: GarabuTheme.warmSand.withValues(alpha: 0.4),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.edit_outlined,
-                                  size: 14,
-                                  color: GarabuTheme.primaryBrown,
-                                ),
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: GarabuTheme.primaryBrown,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Text(
+                              'x$count',
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
                               ),
                             ),
                           ),
@@ -325,6 +323,25 @@ class FeedBottomSheet extends StatelessWidget {
                 ),
               );
             },
+          ),
+          const SizedBox(height: 14),
+
+          // Botón para ir a la Tienda
+          OutlinedButton.icon(
+            onPressed: () {
+              Navigator.of(context).pop();
+              ShopBottomSheet.show(context: context, pet: pet);
+            },
+            icon: const Icon(Icons.storefront_rounded, size: 18),
+            label: const Text('Comprar más alimentos en la Tienda'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: GarabuTheme.primaryBrown,
+              side: const BorderSide(color: GarabuTheme.primaryBrown),
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
           ),
         ],
       ),

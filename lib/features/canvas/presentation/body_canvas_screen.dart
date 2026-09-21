@@ -14,11 +14,13 @@ import 'widgets/eye_widget.dart';
 class BodyCanvasScreen extends ConsumerStatefulWidget {
   final CoupleModel couple;
   final String petName;
+  final PetModel? existingPet;
 
   const BodyCanvasScreen({
     super.key,
     required this.couple,
     required this.petName,
+    this.existingPet,
   });
 
   @override
@@ -30,11 +32,12 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
   CanvasTool _selectedTool = CanvasTool.pencil;
   Color _selectedDrawColor = const Color(0xFF2C2420);
 
-  // Configuración de Ojos
-  RelativePoint _leftEyePos = const RelativePoint(x: 0.38, y: 0.42);
-  RelativePoint _rightEyePos = const RelativePoint(x: 0.62, y: 0.42);
-  Color _selectedEyeColor = const Color(0xFF2C2420);
-  bool _hasEyelashes = false;
+  // Configuración de Ojos y Boca
+  late RelativePoint _leftEyePos;
+  late RelativePoint _rightEyePos;
+  late RelativePoint _mouthPos;
+  late Color _selectedEyeColor;
+  late bool _hasEyelashes;
 
   bool _isExporting = false;
   bool _isWaitingClothes = false;
@@ -48,6 +51,25 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
     Color(0xFF4A6B5B), // Verde esmeralda suave
     Color(0xFF9C4A6B), // Rosa mora
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.existingPet != null) {
+      final config = widget.existingPet!.eyesConfig;
+      _leftEyePos = config.leftEye;
+      _rightEyePos = config.rightEye;
+      _mouthPos = config.resolvedMouth;
+      _selectedEyeColor = Color(config.color);
+      _hasEyelashes = config.hasEyelashes;
+    } else {
+      _leftEyePos = const RelativePoint(x: 0.38, y: 0.42);
+      _rightEyePos = const RelativePoint(x: 0.62, y: 0.42);
+      _mouthPos = const RelativePoint(x: 0.50, y: 0.50);
+      _selectedEyeColor = const Color(0xFF2C2420);
+      _hasEyelashes = false;
+    }
+  }
 
   Future<void> _finishBody() async {
     if (_canvasController == null || _isExporting) return;
@@ -66,12 +88,32 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
       final eyesConfig = EyesConfig(
         leftEye: _leftEyePos,
         rightEye: _rightEyePos,
+        mouth: _mouthPos,
         color: _selectedEyeColor.toARGB32(),
         hasEyelashes: _hasEyelashes,
       );
 
-      // 2. Subir a Storage y crear registro en Firestore
       final petRepo = ref.read(petRepositoryProvider);
+
+      if (widget.existingPet != null) {
+        // Modo Edición: Actualizar mascota existente
+        await petRepo.updatePetBody(
+          petId: widget.existingPet!.id,
+          coupleId: widget.couple.id,
+          bodyBytes: pngBytes,
+          eyesConfig: eyesConfig,
+        );
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('¡Cuerpo y carita actualizados!')),
+          );
+          Navigator.of(context).pop();
+        }
+        return;
+      }
+
+      // 2. Modo Creación: Subir a Storage y crear registro en Firestore
       final pet = await petRepo.createPet(
         coupleId: widget.couple.id,
         name: widget.petName,
@@ -206,10 +248,12 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               color: GarabuTheme.paperWhite,
-              child: const Text(
-                'Dibuja a tu mascota de frente (solo el cuerpo, sin prendas)',
+              child: Text(
+                widget.existingPet != null
+                    ? 'Redibuja la forma de tu mascota o ajusta sus ojitos y boca'
+                    : 'Dibuja a tu mascota de frente (solo el cuerpo, sin prendas)',
                 textAlign: TextAlign.center,
-                style: TextStyle(
+                style: const TextStyle(
                   fontSize: 13.5,
                   fontWeight: FontWeight.w600,
                   color: GarabuTheme.deepEspresso,
@@ -226,7 +270,7 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        // Contenedor del Lienzo con fondo de cuaderno y ojos arrastrables
+                        // Contenedor del Lienzo con fondo de cuaderno y ojos/boca arrastrables
                         Container(
                           width: canvasSize.width,
                           height: canvasSize.height,
@@ -244,7 +288,22 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
                           child: DrawingCanvas(
                             canvasSize: canvasSize,
                             onControllerReady: (c) => _canvasController = c,
-                            backgroundWidget: const NotebookBackground(),
+                            backgroundWidget: Stack(
+                              children: [
+                                const Positioned.fill(child: NotebookBackground()),
+                                if (widget.existingPet != null &&
+                                    widget.existingPet!.bodyImageUrl.isNotEmpty)
+                                  Positioned.fill(
+                                    child: Opacity(
+                                      opacity: 0.35,
+                                      child: Image.network(
+                                        widget.existingPet!.bodyImageUrl,
+                                        fit: BoxFit.contain,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
                             overlayWidget: Stack(
                               children: [
                                 // Ojo Izquierdo interactivo
@@ -265,14 +324,20 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
                                   isLeft: false,
                                   onPositionChanged: (pos) => setState(() => _rightEyePos = pos),
                                 ),
+                                // Boca interactiva
+                                DraggableMouth(
+                                  position: _mouthPos,
+                                  canvasSize: canvasSize,
+                                  onPositionChanged: (pos) => setState(() => _mouthPos = pos),
+                                ),
                               ],
                             ),
                           ),
                         ),
                         const SizedBox(height: 6),
-                        // Instrucción para arrastrar ojos
+                        // Instrucción para arrastrar ojos y boca
                         const Text(
-                          '👁️ Arrastra los ojos para ubicarlos en el cuerpo',
+                          'Arrastra los ojos y la boca para ubicarlos en el cuerpo',
                           style: TextStyle(
                             fontSize: 12,
                             color: GarabuTheme.textSecondary,

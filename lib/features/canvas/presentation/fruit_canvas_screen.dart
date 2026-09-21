@@ -10,22 +10,22 @@ import 'widgets/drawing_canvas.dart';
 class FruitInfo {
   final String key;
   final String name;
-  final String emoji;
+  final Color color;
 
   const FruitInfo({
     required this.key,
     required this.name,
-    required this.emoji,
+    required this.color,
   });
 }
 
 const List<FruitInfo> kAvailableFruits = [
-  FruitInfo(key: 'manzana', name: 'Manzana', emoji: '🍎'),
-  FruitInfo(key: 'naranja', name: 'Naranja', emoji: '🍊'),
-  FruitInfo(key: 'pera', name: 'Pera', emoji: '🍐'),
-  FruitInfo(key: 'pina', name: 'Piña', emoji: '🍍'),
-  FruitInfo(key: 'banano', name: 'Banano', emoji: '🍌'),
-  FruitInfo(key: 'uva', name: 'Uva', emoji: '🍇'),
+  FruitInfo(key: 'manzana', name: 'Manzana', color: Color(0xFFE53935)),
+  FruitInfo(key: 'naranja', name: 'Naranja', color: Color(0xFFFB8C00)),
+  FruitInfo(key: 'pera', name: 'Pera', color: Color(0xFF7CB342)),
+  FruitInfo(key: 'pina', name: 'Piña', color: Color(0xFFFDD835)),
+  FruitInfo(key: 'banano', name: 'Banano', color: Color(0xFFFBC02D)),
+  FruitInfo(key: 'uva', name: 'Uva', color: Color(0xFF8E24AA)),
 ];
 
 class FruitCanvasScreen extends ConsumerStatefulWidget {
@@ -97,11 +97,17 @@ class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
         fruitKey: widget.fruit.key,
         fruitBytes: fruitBytes,
       );
+      // Asegurar al menos 1 unidad en inventario para usar de inmediato
+      await petRepo.buyFruit(
+        petId: widget.pet.id,
+        fruitKey: widget.fruit.key,
+        quantity: 1,
+      );
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('¡${widget.fruit.name} ${widget.fruit.emoji} dibujada con éxito!'),
+            content: Text('¡${widget.fruit.name} dibujada y lista para alimentarlo!'),
             backgroundColor: GarabuTheme.primaryBrown,
           ),
         );
@@ -136,8 +142,8 @@ class _FruitCanvasScreenState extends ConsumerState<FruitCanvasScreen> {
       backgroundColor: GarabuTheme.background,
       appBar: AppBar(
         title: Text(isEditing
-            ? 'Editar: ${widget.fruit.name} ${widget.fruit.emoji}'
-            : 'Dibuja: ${widget.fruit.name} ${widget.fruit.emoji}'),
+            ? 'Editar: ${widget.fruit.name}'
+            : 'Dibuja: ${widget.fruit.name}'),
         actions: [
           IconButton(
             tooltip: _showStencil ? 'Ocultar silueta guía' : 'Mostrar silueta guía',

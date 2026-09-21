@@ -361,21 +361,80 @@ class PetRepository {
     }
   }
 
-  /// Alimentación: Dar fruta a la mascota
+  /// Tienda: Comprar / Adquirir fruta (consumible)
+  Future<void> buyFruit({
+    required String petId,
+    required String fruitKey,
+    int quantity = 1,
+  }) async {
+    final current = await getPet(petId);
+    final inventory = Map<String, int>.from(current?.foodInventory ?? {});
+    inventory[fruitKey] = (inventory[fruitKey] ?? 0) + quantity;
+    final now = DateTime.now();
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'foodInventory': inventory,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          foodInventory: inventory,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Alimentación: Dar fruta a la mascota (consume 1 del inventario)
   Future<void> feedPet({
     required String petId,
     required String fruitKey,
   }) async {
+    final current = await getPet(petId);
+    final inventory = Map<String, int>.from(current?.foodInventory ?? {});
+    final currentCount = inventory[fruitKey] ?? 0;
+    if (currentCount > 0) {
+      inventory[fruitKey] = currentCount - 1;
+    }
     final now = DateTime.now();
+
     if (_firestore != null) {
       await _firestore!.collection('pets').doc(petId).set({
+        'foodInventory': inventory,
         'lastFedAt': now.toIso8601String(),
         'updatedAt': now.toIso8601String(),
       }, SetOptions(merge: true));
     } else {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
+          foodInventory: inventory,
           lastFedAt: now,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Acariciar mascota: sube el ánimo
+  Future<void> petAnimal({
+    required String petId,
+  }) async {
+    final now = DateTime.now();
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'lastPettedAt': now.toIso8601String(),
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          lastPettedAt: now,
           updatedAt: now,
         );
         _mockPets[petId] = updated;
@@ -455,6 +514,39 @@ class PetRepository {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
           backgroundUrl: backgroundUrl,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Editar cuerpo/silueta y ojos/boca de la mascota existente
+  Future<void> updatePetBody({
+    required String petId,
+    required String coupleId,
+    required Uint8List bodyBytes,
+    required EyesConfig eyesConfig,
+  }) async {
+    final now = DateTime.now();
+    final bodyUrl = await uploadImageBytes(
+      coupleId: coupleId,
+      filename: 'body_${petId}_${now.millisecondsSinceEpoch}.png',
+      bytes: bodyBytes,
+    );
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'bodyImageUrl': bodyUrl,
+        'eyesConfig': eyesConfig.toMap(),
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          bodyImageUrl: bodyUrl,
+          eyesConfig: eyesConfig,
           updatedAt: now,
         );
         _mockPets[petId] = updated;

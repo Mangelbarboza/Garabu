@@ -7,9 +7,12 @@
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
   <meta name="description" content="Garabu - Mascota virtual compartida para parejas. Crear, cuidar y crecer.">
 
+  <!-- Viewport Lock: Evita zoom y scrolling elástico en móviles -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+
   <!-- Web & iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Garabu">
   <link rel="apple-touch-icon" href="icons/Icon-192.png">
 
@@ -18,8 +21,26 @@
 
   <title>Garabu</title>
   <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body {
+      position: fixed;
+      width: 100%;
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      overscroll-behavior: none;
+      overscroll-behavior-y: none;
+      touch-action: none;
+      -webkit-touch-callout: none;
+      -webkit-user-select: none;
+      user-select: none;
+      background-color: #FDFCFA;
+    }
+  </style>
 </head>
-<body style="background-color: #FDFCFA; margin: 0; padding: 0;">
+<body>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>
