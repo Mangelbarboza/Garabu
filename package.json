@@ -1,0 +1,9 @@
+{
+  "name": "garabu",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Garabu - Mascota virtual compartida para parejas",
+  "scripts": {
+    "build": "bash ./vercel-build.sh"
+  }
+}

@@ -37,3 +37,4 @@ undecorated_symbol_table
 
 # Obsolete build artifacts
 bin/cache/
+_flutter/
