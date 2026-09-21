@@ -18,6 +18,34 @@ class GarabuTheme {
   static const Color notebookLine = Color(0xFFE6E2DC);
   static const Color notebookMargin = Color(0xFFF0DCD5);
 
+  // Paleta Artística Expandida de 24 colores para Bocetos, Ropas y Frutas
+  static const List<Color> canvasPalette = [
+    Color(0xFF1E1E1E), // Negro Carbón
+    Color(0xFF5A4A42), // Café Chocolate
+    Color(0xFF8D6E63), // Marrón Cálido
+    Color(0xFFC19A6B), // Kraft Canela
+    Color(0xFFE0BB95), // Tono Piel / Arena
+    Color(0xFFF5EBE6), // Crema Suave
+    Color(0xFFFFFFFF), // Blanco Puro
+    Color(0xFF9E9E9E), // Gris Grafito
+    Color(0xFFE53935), // Rojo Manzana
+    Color(0xFFFF7043), // Naranja Mandarina
+    Color(0xFFFFB74D), // Durazno
+    Color(0xFFFFD54F), // Amarillo Banana / Piña
+    Color(0xFFF06292), // Rosa Chicle
+    Color(0xFFBA68C8), // Lila Pastel
+    Color(0xFF880E4F), // Vino Tinto / Mora
+    Color(0xFF7E57C2), // Uva Púrpura
+    Color(0xFF43A047), // Verde Pera
+    Color(0xFF8BC34A), // Verde Lima
+    Color(0xFF2E7D32), // Verde Bosque
+    Color(0xFF80CBC4), // Menta Fresca
+    Color(0xFF00ACC1), // Turquesa
+    Color(0xFF42A5F5), // Azul Cielo
+    Color(0xFF1E88E5), // Azul Océano
+    Color(0xFF3949AB), // Azul Índigo Profundo
+  ];
+
   static ThemeData get lightTheme {
     return ThemeData(
       useMaterial3: true,

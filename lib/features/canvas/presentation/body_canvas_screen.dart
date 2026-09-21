@@ -39,17 +39,7 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
   bool _isExporting = false;
   bool _isWaitingClothes = false;
 
-  final List<Color> _paletteColors = const [
-    Color(0xFF2C2420), // Carbón
-    Color(0xFF8D6E63), // Marrón café
-    Color(0xFFC19A6B), // Kraft/Caramelo
-    Color(0xFFE8DFD8), // Arena suave
-    Color(0xFFF4B6A6), // Durazno/Rosa
-    Color(0xFF8A9A5B), // Verde olivo
-    Color(0xFF7BA7BC), // Azul cielo suave
-    Color(0xFFE3A857), // Mostaza
-    Color(0xFFFFFFFF), // Blanco
-  ];
+  final List<Color> _paletteColors = GarabuTheme.canvasPalette;
 
   final List<Color> _eyePaletteColors = const [
     Color(0xFF2C2420), // Carbón / Negro suave

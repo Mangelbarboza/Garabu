@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import '../../../pet/domain/pet_model.dart';
 
@@ -6,6 +8,8 @@ class EyeWidget extends StatelessWidget {
   final Color color;
   final bool hasEyelashes;
   final bool isLeft;
+  final double blinkProgress; // 0.0 = Abierto, 1.0 = Cerrado
+  final bool isHappy; // Ojos achinados felices estilo kawaii (^_^)
 
   const EyeWidget({
     super.key,
@@ -13,6 +17,8 @@ class EyeWidget extends StatelessWidget {
     required this.color,
     this.hasEyelashes = false,
     this.isLeft = true,
+    this.blinkProgress = 0.0,
+    this.isHappy = false,
   });
 
   @override
@@ -25,6 +31,8 @@ class EyeWidget extends StatelessWidget {
           color: color,
           hasEyelashes: hasEyelashes,
           isLeft: isLeft,
+          blinkProgress: blinkProgress,
+          isHappy: isHappy,
         ),
       ),
     );
@@ -35,11 +43,15 @@ class _EyePainter extends CustomPainter {
   final Color color;
   final bool hasEyelashes;
   final bool isLeft;
+  final double blinkProgress;
+  final bool isHappy;
 
   _EyePainter({
     required this.color,
     required this.hasEyelashes,
     required this.isLeft,
+    required this.blinkProgress,
+    required this.isHappy,
   });
 
   @override
@@ -49,6 +61,61 @@ class _EyePainter extends CustomPainter {
       eyeDiameter / 2,
       hasEyelashes ? (size.height - eyeDiameter / 2) : (size.height / 2),
     );
+
+    // Si está achinado de felicidad (^_^) o totalmente cerrado por parpadeo
+    if (isHappy || blinkProgress >= 0.85) {
+      final linePaint = Paint()
+        ..color = const Color(0xFF2C2420)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.4
+        ..strokeCap = StrokeCap.round;
+
+      final path = Path();
+      if (isHappy) {
+        // Arco hacia arriba (feliz)
+        path.moveTo(eyeCenter.dx - eyeDiameter * 0.45, eyeCenter.dy + 2);
+        path.quadraticBezierTo(
+          eyeCenter.dx,
+          eyeCenter.dy - eyeDiameter * 0.4,
+          eyeCenter.dx + eyeDiameter * 0.45,
+          eyeCenter.dy + 2,
+        );
+      } else {
+        // Arco suave hacia abajo (parpadeo cerrado)
+        path.moveTo(eyeCenter.dx - eyeDiameter * 0.45, eyeCenter.dy - 2);
+        path.quadraticBezierTo(
+          eyeCenter.dx,
+          eyeCenter.dy + eyeDiameter * 0.35,
+          eyeCenter.dx + eyeDiameter * 0.45,
+          eyeCenter.dy - 2,
+        );
+      }
+      canvas.drawPath(path, linePaint);
+
+      // Pestañas cuando está cerrado
+      if (hasEyelashes) {
+        final lashPaint = Paint()
+          ..color = const Color(0xFF2C2420)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 1.8
+          ..strokeCap = StrokeCap.round;
+
+        final midX = eyeCenter.dx;
+        final midY = eyeCenter.dy + (isHappy ? -eyeDiameter * 0.2 : eyeDiameter * 0.2);
+        canvas.drawLine(Offset(midX - 5, midY), Offset(midX - 9, midY - 4), lashPaint);
+        canvas.drawLine(Offset(midX, midY), Offset(midX, midY - 5), lashPaint);
+        canvas.drawLine(Offset(midX + 5, midY), Offset(midX + 9, midY - 4), lashPaint);
+      }
+      return;
+    }
+
+    // Escala vertical para parpadeo fluido
+    final scaleY = (1.0 - (blinkProgress * 0.85)).clamp(0.15, 1.0);
+
+    canvas.save();
+    canvas.translate(eyeCenter.dx, eyeCenter.dy);
+    canvas.scale(1.0, scaleY);
+    canvas.translate(-eyeCenter.dx, -eyeCenter.dy);
 
     // Fondo blanco del globo ocular
     final scleraPaint = Paint()
@@ -86,7 +153,9 @@ class _EyePainter extends CustomPainter {
       shinePaint,
     );
 
-    // Pestañas (si está habilitado)
+    canvas.restore();
+
+    // Pestañas normales si el ojo está abierto
     if (hasEyelashes) {
       final lashPaint = Paint()
         ..color = const Color(0xFF2C2420)
@@ -94,16 +163,14 @@ class _EyePainter extends CustomPainter {
         ..strokeWidth = 1.8
         ..strokeCap = StrokeCap.round;
 
-      final topY = eyeCenter.dy - (eyeDiameter / 2);
+      final topY = eyeCenter.dy - ((eyeDiameter / 2) * scaleY);
       final midX = eyeCenter.dx;
 
       if (isLeft) {
-        // Pestañas inclinadas hacia la izquierda
         canvas.drawLine(Offset(midX - 4, topY + 2), Offset(midX - 9, topY - 5), lashPaint);
         canvas.drawLine(Offset(midX, topY), Offset(midX - 1, topY - 7), lashPaint);
         canvas.drawLine(Offset(midX + 4, topY + 2), Offset(midX + 6, topY - 5), lashPaint);
       } else {
-        // Pestañas inclinadas hacia la derecha
         canvas.drawLine(Offset(midX - 4, topY + 2), Offset(midX - 6, topY - 5), lashPaint);
         canvas.drawLine(Offset(midX, topY), Offset(midX + 1, topY - 7), lashPaint);
         canvas.drawLine(Offset(midX + 4, topY + 2), Offset(midX + 9, topY - 5), lashPaint);
@@ -115,7 +182,9 @@ class _EyePainter extends CustomPainter {
   bool shouldRepaint(covariant _EyePainter oldDelegate) {
     return oldDelegate.color != color ||
         oldDelegate.hasEyelashes != hasEyelashes ||
-        oldDelegate.isLeft != isLeft;
+        oldDelegate.isLeft != isLeft ||
+        oldDelegate.blinkProgress != blinkProgress ||
+        oldDelegate.isHappy != isHappy;
   }
 }
 
@@ -213,6 +282,97 @@ class StaticEyeOverlay extends StatelessWidget {
         color: color,
         hasEyelashes: hasEyelashes,
         isLeft: isLeft,
+      ),
+    );
+  }
+}
+
+/// Widget animado para renderizar ojos que parpadean periódicamente y responden a felicidad
+class BlinkingEyeOverlay extends StatefulWidget {
+  final RelativePoint position;
+  final Size canvasSize;
+  final Color color;
+  final bool hasEyelashes;
+  final bool isLeft;
+  final double eyeSize;
+  final bool isHappy;
+
+  const BlinkingEyeOverlay({
+    super.key,
+    required this.position,
+    required this.canvasSize,
+    required this.color,
+    required this.hasEyelashes,
+    required this.isLeft,
+    this.eyeSize = 30.0,
+    this.isHappy = false,
+  });
+
+  @override
+  State<BlinkingEyeOverlay> createState() => _BlinkingEyeOverlayState();
+}
+
+class _BlinkingEyeOverlayState extends State<BlinkingEyeOverlay>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _blinkController;
+  Timer? _blinkTimer;
+  final _random = Random();
+
+  @override
+  void initState() {
+    super.initState();
+    _blinkController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 140),
+    );
+    _scheduleNextBlink();
+  }
+
+  void _scheduleNextBlink() {
+    _blinkTimer?.cancel();
+    // Parpadea entre 3 y 5.5 segundos de forma natural
+    final delayMs = 3000 + _random.nextInt(2500);
+    _blinkTimer = Timer(Duration(milliseconds: delayMs), () async {
+      if (!mounted) return;
+      if (!widget.isHappy) {
+        await _blinkController.forward();
+        if (mounted) {
+          await _blinkController.reverse();
+        }
+      }
+      if (mounted) {
+        _scheduleNextBlink();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _blinkTimer?.cancel();
+    _blinkController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final pixelX = (widget.position.x * widget.canvasSize.width) - (widget.eyeSize / 2);
+    final pixelY = (widget.position.y * widget.canvasSize.height) - (widget.eyeSize / 2);
+
+    return Positioned(
+      left: pixelX,
+      top: pixelY,
+      child: AnimatedBuilder(
+        animation: _blinkController,
+        builder: (context, _) {
+          return EyeWidget(
+            size: widget.eyeSize,
+            color: widget.color,
+            hasEyelashes: widget.hasEyelashes,
+            isLeft: widget.isLeft,
+            blinkProgress: _blinkController.value,
+            isHappy: widget.isHappy,
+          );
+        },
       ),
     );
   }

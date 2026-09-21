@@ -14,10 +14,14 @@ import 'widgets/eye_widget.dart';
 
 class ClothesCanvasScreen extends ConsumerStatefulWidget {
   final CoupleModel couple;
+  final String? editingGarmentId;
+  final String? initialGarmentName;
 
   const ClothesCanvasScreen({
     super.key,
     required this.couple,
+    this.editingGarmentId,
+    this.initialGarmentName,
   });
 
   @override
@@ -30,17 +34,50 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
   Color _selectedDrawColor = const Color(0xFF2C2420);
   bool _isExporting = false;
 
-  final List<Color> _paletteColors = const [
-    Color(0xFF2C2420), // Carbón
-    Color(0xFF8D6E63), // Marrón café
-    Color(0xFFC19A6B), // Kraft/Caramelo
-    Color(0xFFE8DFD8), // Arena suave
-    Color(0xFFF4B6A6), // Durazno/Rosa
-    Color(0xFF8A9A5B), // Verde olivo
-    Color(0xFF7BA7BC), // Azul cielo suave
-    Color(0xFFE3A857), // Mostaza
-    Color(0xFFFFFFFF), // Blanco
-  ];
+  final List<Color> _paletteColors = GarabuTheme.canvasPalette;
+
+  Future<String?> _promptGarmentName(BuildContext context, int defaultIndex) async {
+    final controller = TextEditingController(
+      text: widget.initialGarmentName ?? 'Prenda #$defaultIndex',
+    );
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: GarabuTheme.cardSurface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          widget.editingGarmentId != null ? 'Editar Prenda 👗' : 'Nueva Prenda 👗',
+          style: const TextStyle(color: GarabuTheme.deepEspresso, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Nombra tu creación:', style: TextStyle(color: GarabuTheme.textSecondary, fontSize: 13)),
+            const SizedBox(height: 10),
+            TextField(
+              controller: controller,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Ej. Sombrero, Bufanda...',
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(null),
+            child: const Text('Cancelar', style: TextStyle(color: GarabuTheme.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+            child: const Text('Guardar'),
+          ),
+        ],
+      ),
+    );
+  }
 
   Future<void> _finishClothes(PetModel pet) async {
     if (_canvasController == null || _isExporting) return;
@@ -50,13 +87,47 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
     });
 
     try {
-      // Exportar solo la prenda como PNG con transparencia (sin incluir el cuerpo ni el fondo)
+      // Exportar solo la prenda como PNG con transparencia
       final clothesBytes = await _canvasController!.exportTransparentPng();
       if (clothesBytes == null) {
         throw Exception('No se pudo generar la imagen de la prenda.');
       }
 
       final petRepo = ref.read(petRepositoryProvider);
+
+      // Si viene desde el clóset (pareja ya en estado 'ready' o editando)
+      if (widget.couple.status == 'ready' || widget.editingGarmentId != null) {
+        if (!mounted) return;
+        final name = await _promptGarmentName(context, pet.closet.length + 1);
+        if (name == null || name.isEmpty) {
+          if (mounted) setState(() => _isExporting = false);
+          return;
+        }
+
+        if (widget.editingGarmentId != null) {
+          await petRepo.updateGarment(
+            petId: pet.id,
+            coupleId: widget.couple.id,
+            garmentId: widget.editingGarmentId!,
+            clothesBytes: clothesBytes,
+            newName: name,
+          );
+        } else {
+          await petRepo.addGarment(
+            petId: pet.id,
+            coupleId: widget.couple.id,
+            clothesBytes: clothesBytes,
+            name: name,
+          );
+        }
+
+        if (mounted) {
+          Navigator.of(context).pop();
+        }
+        return;
+      }
+
+      // Flujo inicial de emparejamiento
       await petRepo.updateClothes(
         petId: pet.id,
         coupleId: widget.couple.id,
@@ -221,7 +292,11 @@ class _ClothesCanvasScreenState extends ConsumerState<ClothesCanvasScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   color: GarabuTheme.paperWhite,
                   child: Text(
-                    'Dibuja UNA prenda para ${pet.name}',
+                    widget.editingGarmentId != null
+                        ? 'Edita la prenda de ${pet.name}'
+                        : (widget.couple.status == 'ready'
+                            ? 'Diseña una nueva prenda para el clóset de ${pet.name}'
+                            : 'Dibuja UNA prenda para ${pet.name}'),
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       fontSize: 13.5,

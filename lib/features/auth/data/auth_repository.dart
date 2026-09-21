@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import '../domain/user_model.dart';
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
@@ -150,6 +151,55 @@ class AuthRepository {
         name: email.split('@').first,
         email: email.trim(),
         age: 20,
+        createdAt: DateTime.now(),
+      );
+      _currentMockUser = mock;
+      _controller.add(mock);
+      return mock;
+    }
+  }
+
+  Future<UserModel?> signInWithGoogle() async {
+    if (_auth != null && _firestore != null) {
+      final GoogleAuthProvider googleProvider = GoogleAuthProvider();
+      UserCredential credential;
+      if (kIsWeb) {
+        credential = await _auth!.signInWithPopup(googleProvider);
+      } else {
+        credential = await _auth!.signInWithProvider(googleProvider);
+      }
+
+      final user = credential.user;
+      if (user == null) return null;
+
+      final doc = await _firestore!.collection('users').doc(user.uid).get();
+      if (doc.exists && doc.data() != null) {
+        final userModel = UserModel.fromMap(doc.data()!, user.uid);
+        _controller.add(userModel);
+        return userModel;
+      } else {
+        final newUser = UserModel(
+          id: user.uid,
+          name: (user.displayName != null && user.displayName!.isNotEmpty)
+              ? user.displayName!
+              : (user.email?.split('@').first ?? 'Usuario'),
+          email: user.email ?? '',
+          age: 18,
+          createdAt: DateTime.now(),
+        );
+        await _firestore!.collection('users').doc(user.uid).set(
+          newUser.toMap(),
+          SetOptions(merge: true),
+        );
+        _controller.add(newUser);
+        return newUser;
+      }
+    } else {
+      final mock = UserModel(
+        id: 'usr_google_demo',
+        name: 'Google User',
+        email: 'user@gmail.com',
+        age: 21,
         createdAt: DateTime.now(),
       );
       _currentMockUser = mock;

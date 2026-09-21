@@ -67,6 +67,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
   }
 
+  Future<void> _signInGoogle() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+
+    try {
+      final authRepo = ref.read(authRepositoryProvider);
+      await authRepo.signInWithGoogle();
+    } catch (e) {
+      setState(() {
+        _errorMessage = e.toString().replaceAll('Exception:', '').trim();
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -206,6 +228,68 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                               ),
                             )
                           : Text(_isRegister ? 'Empezar nuestra historia' : 'Iniciar sesión'),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Divisor "o"
+                    const Row(
+                      children: [
+                        Expanded(child: Divider(color: GarabuTheme.warmSand)),
+                        Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 12),
+                          child: Text(
+                            'o también',
+                            style: TextStyle(color: GarabuTheme.textSecondary, fontSize: 12),
+                          ),
+                        ),
+                        Expanded(child: Divider(color: GarabuTheme.warmSand)),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Botón Google Sign-In
+                    OutlinedButton(
+                      onPressed: _isLoading ? null : _signInGoogle,
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.white,
+                        side: const BorderSide(color: GarabuTheme.warmSand, width: 1.5),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 22,
+                            height: 22,
+                            decoration: const BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Color(0xFF4285F4),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'G',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 14,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          const Text(
+                            'Continuar con Google',
+                            style: TextStyle(
+                              color: GarabuTheme.deepEspresso,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                     const SizedBox(height: 16),
 
