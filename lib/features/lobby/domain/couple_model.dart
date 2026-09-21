@@ -8,6 +8,9 @@ class CoupleModel {
   final int streak;
   final DateTime lastInteraction;
   final String? petId;
+  final String? user1PetId;
+  final String? user2PetId;
+  final String? activePetId;
   final String status; // 'waiting_partner' | 'drawing_body' | 'drawing_clothes' | 'ready'
   final DateTime createdAt;
 
@@ -21,9 +24,15 @@ class CoupleModel {
     this.streak = 1,
     required this.lastInteraction,
     this.petId,
+    this.user1PetId,
+    this.user2PetId,
+    this.activePetId,
     required this.status,
     required this.createdAt,
   });
+
+  String? get resolvedUser1PetId => user1PetId ?? petId;
+  String? get resolvedActivePetId => activePetId ?? resolvedUser1PetId;
 
   Map<String, dynamic> toMap() {
     return {
@@ -35,13 +44,21 @@ class CoupleModel {
       'inviteCode': inviteCode,
       'streak': streak,
       'lastInteraction': lastInteraction.toIso8601String(),
-      'petId': petId,
+      'petId': petId ?? user1PetId,
+      'user1PetId': user1PetId ?? petId,
+      'user2PetId': user2PetId,
+      'activePetId': activePetId ?? petId ?? user1PetId,
       'status': status,
       'createdAt': createdAt.toIso8601String(),
     };
   }
 
   factory CoupleModel.fromMap(Map<String, dynamic> map, String docId) {
+    final rawPetId = map['petId'] as String?;
+    final rawUser1PetId = map['user1PetId'] as String? ?? rawPetId;
+    final rawUser2PetId = map['user2PetId'] as String?;
+    final rawActivePetId = map['activePetId'] as String? ?? rawUser1PetId;
+
     return CoupleModel(
       id: docId,
       user1Id: map['user1Id'] ?? '',
@@ -53,7 +70,10 @@ class CoupleModel {
       lastInteraction: map['lastInteraction'] != null
           ? DateTime.tryParse(map['lastInteraction']) ?? DateTime.now()
           : DateTime.now(),
-      petId: map['petId'],
+      petId: rawPetId,
+      user1PetId: rawUser1PetId,
+      user2PetId: rawUser2PetId,
+      activePetId: rawActivePetId,
       status: map['status'] ?? 'waiting_partner',
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
@@ -71,6 +91,9 @@ class CoupleModel {
     int? streak,
     DateTime? lastInteraction,
     String? petId,
+    String? user1PetId,
+    String? user2PetId,
+    String? activePetId,
     String? status,
     DateTime? createdAt,
   }) {
@@ -84,6 +107,9 @@ class CoupleModel {
       streak: streak ?? this.streak,
       lastInteraction: lastInteraction ?? this.lastInteraction,
       petId: petId ?? this.petId,
+      user1PetId: user1PetId ?? this.user1PetId,
+      user2PetId: user2PetId ?? this.user2PetId,
+      activePetId: activePetId ?? this.activePetId,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
     );

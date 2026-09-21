@@ -22,6 +22,7 @@ class DrawingCanvas extends StatefulWidget {
   final Size canvasSize;
   final Widget? backgroundWidget;
   final Widget? overlayWidget;
+  final Uint8List? initialImageBytes;
   final VoidCallback? onDrawingStarted;
   final void Function(DrawingCanvasController controller)? onControllerReady;
 
@@ -30,6 +31,7 @@ class DrawingCanvas extends StatefulWidget {
     required this.canvasSize,
     this.backgroundWidget,
     this.overlayWidget,
+    this.initialImageBytes,
     this.onDrawingStarted,
     this.onControllerReady,
   });
@@ -47,6 +49,7 @@ class DrawingCanvasController {
   void setStrokeWidth(double width) => _state.setStrokeWidth(width);
   void undo() => _state.undo();
   void clear() => _state.clear();
+  Future<void> loadRasterImage(Uint8List pngBytes) => _state.loadRasterImage(pngBytes);
 
   Future<Uint8List?> exportTransparentPng() => _state.exportTransparentPng();
 }
@@ -58,14 +61,37 @@ class DrawingCanvasState extends State<DrawingCanvas> {
 
   final List<DrawnLine> _lines = [];
   DrawnLine? _activeLine;
-  ui.Image? _rasterLayer; // Capa de píxeles generada por el balde de pintura (Flood fill)
+  ui.Image? _rasterLayer; // Capa de píxeles generada por el balde de pintura o dibujo existente
   final List<ui.Image?> _rasterHistory = [];
 
   @override
   void initState() {
     super.initState();
+    if (widget.initialImageBytes != null) {
+      loadRasterImage(widget.initialImageBytes!);
+    }
     if (widget.onControllerReady != null) {
       widget.onControllerReady!(DrawingCanvasController(this));
+    }
+  }
+
+  Future<void> loadRasterImage(Uint8List pngBytes) async {
+    try {
+      final codec = await ui.instantiateImageCodec(
+        pngBytes,
+        targetWidth: widget.canvasSize.width.toInt(),
+        targetHeight: widget.canvasSize.height.toInt(),
+      );
+      final frameInfo = await codec.getNextFrame();
+      if (mounted) {
+        setState(() {
+          _rasterHistory.clear();
+          _lines.clear();
+          _rasterLayer = frameInfo.image;
+        });
+      }
+    } catch (e) {
+      debugPrint('Error al cargar imagen en DrawingCanvas: $e');
     }
   }
 

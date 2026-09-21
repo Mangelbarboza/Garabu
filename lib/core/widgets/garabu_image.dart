@@ -11,6 +11,9 @@ class GarabuImage extends StatelessWidget {
   final Widget? placeholder;
   final Widget? errorWidget;
 
+  // Cache estático en memoria para evitar recodificar base64 en cada build
+  static final Map<String, Uint8List> _base64Cache = {};
+
   const GarabuImage({
     super.key,
     required this.imageUrl,
@@ -31,16 +34,21 @@ class GarabuImage extends StatelessWidget {
     // 1. Manejo de Data URI en Base64
     if (raw.contains('base64,') || (!raw.startsWith('http://') && !raw.startsWith('https://') && raw.length > 50)) {
       try {
-        final cleanBase64 = raw.contains('base64,')
-            ? raw.split('base64,').last.replaceAll(RegExp(r'\s+'), '')
-            : raw.replaceAll(RegExp(r'\s+'), '');
-        final Uint8List bytes = base64Decode(cleanBase64);
+        Uint8List? bytes = _base64Cache[raw];
+        if (bytes == null) {
+          final cleanBase64 = raw.contains('base64,')
+              ? raw.split('base64,').last.replaceAll(RegExp(r'\s+'), '')
+              : raw.replaceAll(RegExp(r'\s+'), '');
+          bytes = base64Decode(cleanBase64);
+          _base64Cache[raw] = bytes;
+        }
 
         return Image.memory(
           bytes,
           width: width,
           height: height,
           fit: fit,
+          gaplessPlayback: true,
           errorBuilder: (_, __, ___) => _buildFallback(),
         );
       } catch (e) {
@@ -55,6 +63,7 @@ class GarabuImage extends StatelessWidget {
       width: width,
       height: height,
       fit: fit,
+      gaplessPlayback: true,
       errorBuilder: (context, error, stackTrace) => _buildFallback(),
       loadingBuilder: (context, child, loadingProgress) {
         if (loadingProgress == null) return child;

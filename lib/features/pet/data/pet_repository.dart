@@ -532,7 +532,7 @@ class PetRepository {
     final now = DateTime.now();
     final bodyUrl = await uploadImageBytes(
       coupleId: coupleId,
-      filename: 'body_${petId}_${now.millisecondsSinceEpoch}.png',
+      filename: 'body_$petId.png',
       bytes: bodyBytes,
     );
 

@@ -58,7 +58,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   String? _speechBubbleText;
   Timer? _happyResetTimer;
   Timer? _happyStopTimer;
-  final List<_SketchParticleData> _particles = [];
+  final ValueNotifier<List<_SketchParticleData>> _particlesNotifier =
+      ValueNotifier<List<_SketchParticleData>>([]);
   final Random _random = Random();
   int _lastParticleTime = 0;
   int _lastPettedDbTime = 0;
@@ -157,6 +158,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     _squashController.dispose();
     _purrController.dispose();
     _blinkController.dispose();
+    _particlesNotifier.dispose();
     _blinkTimer?.cancel();
     _happyResetTimer?.cancel();
     _happyStopTimer?.cancel();
@@ -164,11 +166,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   }
 
   void _spawnSketchParticle(Offset origin) {
-    final colors = [
-      const Color(0xFFE57373), // Rosa rojizo suave
-      const Color(0xFFF06292), // Rosa pastel
-      const Color(0xFFFBC02D), // Dorado estrella
-      const Color(0xFFFFB74D), // Ámbar cálido
+    const colors = [
+      Color(0xFFE57373), // Rosa rojizo suave
+      Color(0xFFF06292), // Rosa pastel
+      Color(0xFFFBC02D), // Dorado estrella
+      Color(0xFFFFB74D), // Ámbar cálido
     ];
 
     final isHeart = _random.nextBool();
@@ -180,12 +182,12 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       color: colors[_random.nextInt(colors.length)],
     );
 
-    setState(() {
-      _particles.add(particle);
-      if (_particles.length > 12) {
-        _particles.removeAt(0);
-      }
-    });
+    final current = List<_SketchParticleData>.from(_particlesNotifier.value);
+    current.add(particle);
+    if (current.length > 12) {
+      current.removeAt(0);
+    }
+    _particlesNotifier.value = current;
   }
 
   void _onPetStroke(PetModel pet, Offset localPosition) {
@@ -193,7 +195,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    // Generar partículas fluidas cada 140ms mientras se acaricia
+    // Generar partículas fluidas cada 140ms
     if (now - _lastParticleTime > 140) {
       _lastParticleTime = now;
       _spawnSketchParticle(localPosition);
@@ -204,12 +206,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       _purrController.repeat(reverse: true);
     }
 
-    // Actualizar ánimo en la base de datos (con debounce de 8 segundos)
-    if (now - _lastPettedDbTime > 8000) {
-      _lastPettedDbTime = now;
-      ref.read(petRepositoryProvider).petAnimal(petId: pet.id);
-    }
-
     _happyStopTimer?.cancel();
     if (!_isPetHappy) {
       setState(() {
@@ -218,10 +214,18 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       });
     }
 
-    // Detener suavemente cuando el usuario suelta
+    // Detener suavemente cuando el usuario suelta el dedo
     _happyStopTimer = Timer(const Duration(milliseconds: 650), () {
       if (mounted) {
         _purrController.animateTo(0.0, duration: const Duration(milliseconds: 180));
+
+        // Actualizar Firestore SOLO al finalizar la sesión de caricias (debounce 12s)
+        final strokeDoneNow = DateTime.now().millisecondsSinceEpoch;
+        if (strokeDoneNow - _lastPettedDbTime > 12000) {
+          _lastPettedDbTime = strokeDoneNow;
+          ref.read(petRepositoryProvider).petAnimal(petId: pet.id);
+        }
+
         _happyResetTimer?.cancel();
         _happyResetTimer = Timer(const Duration(milliseconds: 1200), () {
           if (mounted) {
@@ -383,15 +387,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Widget build(BuildContext context) {
     final coupleAsync = ref.watch(currentCoupleProvider(widget.couple.id));
     final currentCouple = coupleAsync.value ?? widget.couple;
-    final petId = currentCouple.petId;
+    final activePetId = currentCouple.resolvedActivePetId;
 
-    if (petId == null) {
+    if (activePetId == null) {
       return const Scaffold(
         body: Center(child: Text('Buscando mascota...')),
       );
     }
 
-    final petAsync = ref.watch(currentPetProvider(petId));
+    final petAsync = ref.watch(currentPetProvider(activePetId));
     final lettersAsync = ref.watch(lettersProvider(currentCouple.id));
     final unreadLettersCount = lettersAsync.value
             ?.where((l) => !l.isRead && l.senderId != ref.read(currentUserProvider)?.id)
@@ -563,15 +567,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                   fit: BoxFit.contain,
                                 ),
 
-                              // Partículas de caricias hechas con trazos de lápiz (estrellas y corazones dibujados a mano, NO emojis)
-                              ..._particles.map(
-                                (p) => _SketchParticleWidget(
-                                  key: p.key,
-                                  particle: p,
-                                  onDismissed: () {
-                                    setState(() => _particles.removeWhere((item) => item.key == p.key));
-                                  },
-                                ),
+                              // Partículas de caricias aisladas en ValueListenableBuilder (cero rebuilds de la pantalla)
+                              ValueListenableBuilder<List<_SketchParticleData>>(
+                                valueListenable: _particlesNotifier,
+                                builder: (context, particles, _) {
+                                  return Stack(
+                                    children: particles.map((p) => _SketchParticleWidget(
+                                      key: p.key,
+                                      particle: p,
+                                      onDismissed: () {
+                                        final current = List<_SketchParticleData>.from(_particlesNotifier.value)
+                                          ..removeWhere((item) => item.key == p.key);
+                                        _particlesNotifier.value = current;
+                                      },
+                                    )).toList(),
+                                  );
+                                },
                               ),
 
                               // Globo de diálogo o Zzz si duerme
@@ -657,7 +668,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
                           child: Column(
                             children: [
-                              // 1. Barra Superior Nativa (Racha, Nombre, Modo Noche, Editar Cuerpo, Salir)
+                              // 1. Barra Superior Nativa (Racha, Selector de Slots, Modo Noche, Editar Cuerpo, Salir)
                               Row(
                                 children: [
                                   // Racha con fueguito limpio y número
@@ -688,23 +699,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                       ],
                                     ),
                                   ),
-                                  const SizedBox(width: 10),
+                                  const SizedBox(width: 8),
 
-                                  // Nombre de la Mascota
+                                  // Selector de Slots de Personaje
                                   Expanded(
-                                    child: Text(
-                                      pet.name,
-                                      textAlign: TextAlign.center,
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        fontSize: 22,
-                                        fontWeight: FontWeight.bold,
-                                        color: GarabuTheme.deepEspresso,
-                                        letterSpacing: -0.5,
-                                      ),
+                                    child: Center(
+                                      child: _buildSlotSelector(currentCouple),
                                     ),
                                   ),
+                                  const SizedBox(width: 8),
 
                                   // Botón de Apagar / Encender la luz
                                   IconButton(
@@ -745,6 +748,21 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                     onPressed: () => ref.read(authRepositoryProvider).signOut(),
                                   ),
                                 ],
+                              ),
+
+                              // Nombre de la Mascota activa
+                              const SizedBox(height: 4),
+                              Text(
+                                pet.name,
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: GarabuTheme.deepEspresso,
+                                  letterSpacing: -0.5,
+                                ),
                               ),
 
                               // Barras de estadísticas compactas en móvil o toggle
@@ -980,6 +998,133 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             );
           },
         ),
+      ),
+    );
+  }
+
+  Widget _buildSlotSelector(CoupleModel couple) {
+    final user1PetId = couple.resolvedUser1PetId;
+    final user2PetId = couple.user2PetId;
+    final activePetId = couple.resolvedActivePetId;
+
+    final isSlot1Active = activePetId == user1PetId;
+    final isSlot2Active = activePetId == user2PetId && user2PetId != null;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+      decoration: BoxDecoration(
+        color: GarabuTheme.warmSand.withValues(alpha: 0.35),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Slot 1 (Usuario 1)
+          InkWell(
+            onTap: () {
+              if (user1PetId != null && !isSlot1Active) {
+                ref.read(lobbyRepositoryProvider).switchActivePet(
+                  coupleId: couple.id,
+                  petId: user1PetId,
+                );
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSlot1Active ? GarabuTheme.primaryBrown : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Slot 1: ${couple.user1Name}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSlot1Active ? Colors.white : GarabuTheme.deepEspresso,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 4),
+          // Slot 2 (Usuario 2)
+          InkWell(
+            onTap: () async {
+              if (user2PetId != null) {
+                if (!isSlot2Active) {
+                  ref.read(lobbyRepositoryProvider).switchActivePet(
+                    coupleId: couple.id,
+                    petId: user2PetId,
+                  );
+                }
+              } else {
+                // Crear mascota para Slot 2
+                final petName = await showDialog<String>(
+                  context: context,
+                  builder: (ctx) {
+                    final controller = TextEditingController();
+                    return AlertDialog(
+                      backgroundColor: GarabuTheme.cardSurface,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      title: Text('Personaje de ${couple.user2Name ?? "Pareja"}'),
+                      content: TextField(
+                        controller: controller,
+                        autofocus: true,
+                        decoration: const InputDecoration(
+                          hintText: 'Nombre de la mascota',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx),
+                          child: const Text('Cancelar'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+                          child: const Text('Comenzar boceto'),
+                        ),
+                      ],
+                    );
+                  },
+                );
+
+                if (petName != null && petName.isNotEmpty && mounted) {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => BodyCanvasScreen(
+                        couple: couple,
+                        petName: petName,
+                      ),
+                    ),
+                  );
+                }
+              }
+            },
+            borderRadius: BorderRadius.circular(12),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              decoration: BoxDecoration(
+                color: isSlot2Active ? GarabuTheme.primaryBrown : Colors.transparent,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                user2PetId != null
+                    ? 'Slot 2: ${couple.user2Name ?? "Pareja"}'
+                    : '+ Slot 2 (${couple.user2Name ?? "Pareja"})',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.bold,
+                  color: isSlot2Active ? Colors.white : GarabuTheme.deepEspresso,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -169,4 +169,58 @@ class LobbyRepository {
       }
     }
   }
+
+  Future<void> switchActivePet({
+    required String coupleId,
+    required String petId,
+  }) async {
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set({
+        'activePetId': petId,
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final current = _mockCouples[coupleId]!;
+        final updated = current.copyWith(activePetId: petId);
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
+
+  Future<void> assignPetToSlot({
+    required String coupleId,
+    required int slotNumber,
+    required String petId,
+  }) async {
+    final field = slotNumber == 1 ? 'user1PetId' : 'user2PetId';
+    final updates = <String, dynamic>{
+      field: petId,
+      'activePetId': petId,
+      'status': 'ready',
+    };
+    if (slotNumber == 1) {
+      updates['petId'] = petId;
+    }
+
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set(
+        updates,
+        SetOptions(merge: true),
+      );
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final current = _mockCouples[coupleId]!;
+        final updated = current.copyWith(
+          user1PetId: slotNumber == 1 ? petId : current.user1PetId,
+          user2PetId: slotNumber == 2 ? petId : current.user2PetId,
+          petId: slotNumber == 1 ? petId : current.petId,
+          activePetId: petId,
+          status: 'ready',
+        );
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
 }

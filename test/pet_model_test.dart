@@ -106,5 +106,37 @@ void main() {
       expect(pet.closet.first.imageUrl, 'data:image/png;base64,first_garment');
       expect(pet.activeGarmentId, 'initial_garment');
     });
+
+    test('CoupleModel maneja slots de personaje correctamente', () {
+      final now = DateTime.now();
+      final couple = CoupleModel(
+        id: 'cpl_1',
+        user1Id: 'u1',
+        user1Name: 'Angel',
+        user2Id: 'u2',
+        user2Name: 'Maria',
+        inviteCode: '123456',
+        streak: 2,
+        lastInteraction: now,
+        petId: 'pet_user1',
+        user1PetId: 'pet_user1',
+        user2PetId: 'pet_user2',
+        activePetId: 'pet_user1',
+        status: 'ready',
+        createdAt: now,
+      );
+
+      expect(couple.resolvedUser1PetId, 'pet_user1');
+      expect(couple.resolvedActivePetId, 'pet_user1');
+
+      final switched = couple.copyWith(activePetId: 'pet_user2');
+      expect(switched.resolvedActivePetId, 'pet_user2');
+
+      final map = switched.toMap();
+      final fromMap = CoupleModel.fromMap(map, 'cpl_1');
+      expect(fromMap.user1PetId, 'pet_user1');
+      expect(fromMap.user2PetId, 'pet_user2');
+      expect(fromMap.activePetId, 'pet_user2');
+    });
   });
 }

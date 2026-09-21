@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/garabu_theme.dart';
@@ -31,6 +33,7 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
   DrawingCanvasController? _canvasController;
   CanvasTool _selectedTool = CanvasTool.pencil;
   Color _selectedDrawColor = const Color(0xFF2C2420);
+  Uint8List? _existingBodyBytes;
 
   // Configuración de Ojos y Boca
   late RelativePoint _leftEyePos;
@@ -62,6 +65,15 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
       _mouthPos = config.resolvedMouth;
       _selectedEyeColor = Color(config.color);
       _hasEyelashes = config.hasEyelashes;
+
+      // Cargar los bytes del cuerpo actual para montarlo en la capa del lienzo
+      final raw = widget.existingPet!.bodyImageUrl;
+      if (raw.contains('base64,')) {
+        try {
+          final clean = raw.split('base64,').last.replaceAll(RegExp(r'\s+'), '');
+          _existingBodyBytes = base64Decode(clean);
+        } catch (_) {}
+      }
     } else {
       _leftEyePos = const RelativePoint(x: 0.38, y: 0.42);
       _rightEyePos = const RelativePoint(x: 0.62, y: 0.42);
@@ -121,8 +133,25 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
         eyesConfig: eyesConfig,
       );
 
-      // 3. Notificar en Firestore que el cuerpo está listo y le toca a Usuario 2
       final lobbyRepo = ref.read(lobbyRepositoryProvider);
+
+      // Si ya existía el Slot 1, este personaje nuevo se asigna al Slot 2
+      if (widget.couple.resolvedUser1PetId != null) {
+        await lobbyRepo.assignPetToSlot(
+          coupleId: widget.couple.id,
+          slotNumber: 2,
+          petId: pet.id,
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('¡Personaje ${widget.petName} creado para el Slot 2!')),
+          );
+          Navigator.of(context).pop();
+        }
+        return;
+      }
+
+      // 3. Flujo inicial de Onboarding: Notificar en Firestore que el cuerpo está listo y le toca a Usuario 2
       await lobbyRepo.updateCoupleStatus(
         widget.couple.id,
         'drawing_clothes',
@@ -287,23 +316,14 @@ class _BodyCanvasScreenState extends ConsumerState<BodyCanvasScreen> {
                           clipBehavior: Clip.antiAlias,
                           child: DrawingCanvas(
                             canvasSize: canvasSize,
-                            onControllerReady: (c) => _canvasController = c,
-                            backgroundWidget: Stack(
-                              children: [
-                                const Positioned.fill(child: NotebookBackground()),
-                                if (widget.existingPet != null &&
-                                    widget.existingPet!.bodyImageUrl.isNotEmpty)
-                                  Positioned.fill(
-                                    child: Opacity(
-                                      opacity: 0.35,
-                                      child: Image.network(
-                                        widget.existingPet!.bodyImageUrl,
-                                        fit: BoxFit.contain,
-                                      ),
-                                    ),
-                                  ),
-                              ],
-                            ),
+                            initialImageBytes: _existingBodyBytes,
+                            onControllerReady: (c) {
+                              _canvasController = c;
+                              if (_existingBodyBytes != null) {
+                                c.loadRasterImage(_existingBodyBytes!);
+                              }
+                            },
+                            backgroundWidget: const NotebookBackground(),
                             overlayWidget: Stack(
                               children: [
                                 // Ojo Izquierdo interactivo
