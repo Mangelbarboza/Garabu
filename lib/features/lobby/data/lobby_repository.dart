@@ -359,4 +359,50 @@ class LobbyRepository {
       }
     }
   }
+
+  /// Guarda o actualiza el estado de la ronda de Trivia de Pareja
+  Future<void> updateActiveTrivia({
+    required String coupleId,
+    required Map<String, dynamic>? triviaData,
+  }) async {
+    final now = DateTime.now();
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set({
+        'activeTrivia': triviaData,
+        'lastInteraction': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final updated = _mockCouples[coupleId]!.copyWith(
+          activeTrivia: triviaData,
+          lastInteraction: now,
+        );
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
+
+  /// Guarda o actualiza el estado de la partida de Dibuja y Adivina (Pinturillo)
+  Future<void> updateActivePinturillo({
+    required String coupleId,
+    required Map<String, dynamic>? pinturilloData,
+  }) async {
+    final now = DateTime.now();
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set({
+        'activePinturillo': pinturilloData,
+        'lastInteraction': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final updated = _mockCouples[coupleId]!.copyWith(
+          activePinturillo: pinturilloData,
+          lastInteraction: now,
+        );
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
 }

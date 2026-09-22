@@ -354,12 +354,14 @@ class PetRepository {
     }
   }
 
-  /// Clóset: Ajustar posición (offset) de una prenda
-  Future<void> updateGarmentOffset({
+  /// Clóset: Ajustar posición (offset), escala y rotación de una prenda
+  Future<void> updateGarmentTransform({
     required String petId,
     required String garmentId,
     required double offsetX,
     required double offsetY,
+    double scale = 1.0,
+    double rotation = 0.0,
   }) async {
     final current = await getPet(petId);
     if (current == null) return;
@@ -369,7 +371,12 @@ class PetRepository {
     final index = closet.indexWhere((g) => g.id == garmentId);
     if (index == -1) return;
 
-    closet[index] = closet[index].copyWith(offsetX: offsetX, offsetY: offsetY);
+    closet[index] = closet[index].copyWith(
+      offsetX: offsetX,
+      offsetY: offsetY,
+      scale: scale,
+      rotation: rotation,
+    );
 
     if (_firestore != null) {
       await _firestore!.collection('pets').doc(petId).set({
@@ -387,6 +394,20 @@ class PetRepository {
       }
     }
   }
+
+  /// Clóset: Ajustar posición (offset) de una prenda (retrocompatibilidad)
+  Future<void> updateGarmentOffset({
+    required String petId,
+    required String garmentId,
+    required double offsetX,
+    required double offsetY,
+  }) =>
+      updateGarmentTransform(
+        petId: petId,
+        garmentId: garmentId,
+        offsetX: offsetX,
+        offsetY: offsetY,
+      );
 
   /// Fondos: Guardar fondo en uno de los 3 slots
   Future<void> updateBackgroundSlot({
@@ -796,14 +817,19 @@ class PetRepository {
     }
   }
 
-  /// Sueño: Apagar / Encender la luz (con recuperación de energía)
+  /// Sueño: Apagar / Encender la luz (con preservación de energía continua)
   Future<void> toggleSleep({
     required String petId,
     required bool isSleeping,
   }) async {
+    final current = await getPet(petId);
     final now = DateTime.now();
+    // Guardar la energía calculada continua actual para que no haya saltos arbitrarios
+    final currentEnergy = current?.energy ?? 1.0;
+
     final updateData = <String, dynamic>{
       'isSleeping': isSleeping,
+      'energyValue': currentEnergy,
       'updatedAt': now.toIso8601String(),
     };
     if (isSleeping) {
@@ -818,6 +844,7 @@ class PetRepository {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
           isSleeping: isSleeping,
+          energyValue: currentEnergy,
           sleepStartedAt: isSleeping ? now : _mockPets[petId]?.sleepStartedAt,
           lastSleptAt: !isSleeping ? now : _mockPets[petId]?.lastSleptAt,
           updatedAt: now,

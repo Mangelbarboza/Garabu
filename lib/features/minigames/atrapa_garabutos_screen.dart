@@ -142,6 +142,7 @@ class _AtrapaGarabutosScreenState extends ConsumerState<AtrapaGarabutosScreen>
 
   PetEmotion _petReactionEmotion = PetEmotion.happy;
   bool _isBombShaking = false;
+  bool _isHoldingTouch = false;
 
   bool get _isItemCloseToMouth {
     for (final it in _items) {
@@ -443,13 +444,22 @@ class _AtrapaGarabutosScreenState extends ConsumerState<AtrapaGarabutosScreen>
             // Fondo de cuaderno
             const NotebookBackground(),
 
-            // Controles de movimiento táctil / mouse
-            GestureDetector(
+            // Controles de movimiento táctil / mouse estables y precisos
+            Listener(
               behavior: HitTestBehavior.opaque,
-              onPanUpdate: (details) {
-                final normalized = (details.localPosition.dx / size.width).clamp(0.08, 0.92);
+              onPointerDown: (event) {
+                _isHoldingTouch = true;
+                final normalized = (event.localPosition.dx / size.width).clamp(0.08, 0.92);
                 setState(() => _basketNormalizedX = normalized);
               },
+              onPointerMove: (event) {
+                if (_isHoldingTouch) {
+                  final normalized = (event.localPosition.dx / size.width).clamp(0.08, 0.92);
+                  setState(() => _basketNormalizedX = normalized);
+                }
+              },
+              onPointerUp: (_) => _isHoldingTouch = false,
+              onPointerCancel: (_) => _isHoldingTouch = false,
               child: MouseRegion(
                 onHover: (event) {
                   final normalized = (event.localPosition.dx / size.width).clamp(0.08, 0.92);

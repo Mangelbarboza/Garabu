@@ -460,11 +460,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         widgets.add(
           Transform.translate(
             offset: Offset(garment.offsetX, garment.offsetY),
-            child: GarabuImage(
-              imageUrl: garment.imageUrl,
-              width: canvasSize.width,
-              height: canvasSize.height,
-              fit: BoxFit.contain,
+            child: Transform.rotate(
+              angle: garment.rotation,
+              child: Transform.scale(
+                scale: garment.scale,
+                child: GarabuImage(
+                  imageUrl: garment.imageUrl,
+                  width: canvasSize.width,
+                  height: canvasSize.height,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
           ),
         );
@@ -667,15 +673,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                             else
                               const NotebookBackground(),
 
-                            // 2. Modo Noche (Luz apagada) estático
-                            if (pet.isSleeping)
-                              Container(
-                                color: const Color(0xCC101522),
-                                width: canvasSize.width,
-                                height: canvasSize.height,
-                              ),
-
-                            // 3. Capa animada exclusiva para el muñeco y su ropita anclada
+                            // 2. Capa animada exclusiva para el muñeco y su ropita anclada
                             AnimatedBuilder(
                               animation: Listenable.merge([
                                 _bounceAnimation,
@@ -751,11 +749,24 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                   // Boca interactiva anclada
                                   _buildPetMouth(pet, canvasSize, petEmotion),
 
-                                  // Prendas activas del Clóset (hasta 2 prendas con sus offsets)
+                                  // Prendas activas del Clóset (hasta 5 prendas con sus offsets y transformaciones)
                                   ..._buildEquippedGarments(pet, canvasSize),
                                 ],
                               ),
                             ),
+
+                            // Modo Noche (Luz apagada): Cubre y oscurece todo el cuarto y la mascota armónicamente
+                            if (pet.isSleeping)
+                              Positioned.fill(
+                                child: IgnorePointer(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xC70B1020),
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
+                                  ),
+                                ),
+                              ),
 
                             // 4. Partículas de caricias aisladas en ValueListenableBuilder
                             ValueListenableBuilder<List<_SketchParticleData>>(

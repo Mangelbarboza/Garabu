@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,21 +7,18 @@ import '../../core/widgets/garabu_image.dart';
 import '../../core/widgets/notebook_background.dart';
 import '../lobby/data/lobby_repository.dart';
 import '../lobby/domain/couple_model.dart';
-import '../canvas/presentation/widgets/eye_widget.dart';
 import '../pet/data/pet_repository.dart';
 import '../pet/domain/pet_model.dart';
 
-class TriviaQuestion {
+class TriviaQuestionData {
   final String category;
   final String question;
   final List<String> Function(String user1, String user2) optionsBuilder;
-  final int bonusPoints;
 
-  TriviaQuestion({
+  TriviaQuestionData({
     required this.category,
     required this.question,
     required this.optionsBuilder,
-    this.bonusPoints = 20,
   });
 }
 
@@ -45,126 +41,132 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
   final Random _random = Random();
 
   late AnimationController _bounceController;
-  late AnimationController _heartController;
 
   int _currentIndex = 0;
-  int _score = 0;
   int? _selectedOptionIndex;
-  bool _isRoundFinished = false;
+  final List<int> _myAnswers = [];
 
-  late List<TriviaQuestion> _roundQuestions;
-
-  // Banco de preguntas
-  final List<TriviaQuestion> _allQuestions = [
-    TriviaQuestion(
-      category: '💑 ¿Quién es más...?',
-      question: '¿Quién es más probable que se quede dormido a mitad de una película?',
+  // Banco amplio de preguntas sin emojis
+  static final List<TriviaQuestionData> questionBank = [
+    TriviaQuestionData(
+      category: 'Quien es mas probable que',
+      question: 'Quien es mas probable que se quede dormido a mitad de una pelicula?',
       optionsBuilder: (u1, u2) => [
-        '¡$u1 sin duda! 😴',
-        '¡$u2 totalmente! 🍿',
-        '¡Los dos caemos rendidos! 😂',
-        '¡Ninguno, vemos maratones! 🎬',
+        'Definitivamente $u1',
+        'Sin duda alguna $u2',
+        'Ambos caemos rendidos por igual',
+        'Ninguno, vemos la pelicula completa',
       ],
-      bonusPoints: 20,
     ),
-    TriviaQuestion(
-      category: '🐾 Cuidado de Garabu',
-      question: '¿Qué le gusta más a Garabu después de comer frutitas?',
+    TriviaQuestionData(
+      category: 'Quien es mas probable que',
+      question: 'Quien tarda mas tiempo en arreglarse antes de salir?',
       optionsBuilder: (u1, u2) => [
-        '¡Que le hagan muchas caricias! 🥰',
-        '¡Dormir su siesta bien calientito! 💤',
-        '¡Ponerse sus prendas favoritas! 👗',
-        '¡Jugar a atrapar garabutos! 🎮',
+        'Claramente $u1',
+        'Sin duda $u2 tarda mas',
+        'Tardamos exactamente lo mismo',
+        'Somos bastante rapidos los dos',
       ],
-      bonusPoints: 25,
     ),
-    TriviaQuestion(
-      category: '💑 ¿Quién es más...?',
-      question: '¿Quién tarda más tiempo en arreglarse antes de salir?',
+    TriviaQuestionData(
+      category: 'Quien es mas probable que',
+      question: 'Quien suele tener hambre primero o buscar comida a media noche?',
       optionsBuilder: (u1, u2) => [
-        '¡$u1 se toma todo su tiempo! 👗',
-        '¡$u2 tarda un siglo entero! ⏱️',
-        '¡Ambos somos súper rápidos! ⚡',
-        '¡Garabu tarda más cambiándose! 🎀',
+        '$u1 siempre tiene apetito',
+        '$u2 es quien busca snacks',
+        'Los dos nos antojamos juntos',
+        'Rara vez comemos tan tarde',
       ],
-      bonusPoints: 20,
     ),
-    TriviaQuestion(
-      category: '💌 Amor & Pareja',
-      question: '¿Cuál es el plan perfecto para un fin de semana juntos?',
+    TriviaQuestionData(
+      category: 'Quien es mas probable que',
+      question: 'Quien es mas detallista y recuerda las fechas especiales con anticipacion?',
       optionsBuilder: (u1, u2) => [
-        'Peli, cobijitas y consentir a Garabu 🛋️',
-        'Salir a cenar algo delicioso 🍕',
-        'Aventuras, caminatas y fotos juntos 📸',
-        'Dormir 12 horas seguidas sin alarma 😴',
+        '$u1 tiene mejor memoria para fechas',
+        '$u2 siempre esta al pendiente',
+        'Ambos nos recordamos mutuamente',
+        'Usamos recordatorios o calendarios',
       ],
-      bonusPoints: 25,
     ),
-    TriviaQuestion(
-      category: '💑 ¿Quién es más...?',
-      question: '¿Quién suele tener hambre primero o pedir snacks a media noche?',
+    TriviaQuestionData(
+      category: 'Quien es mas probable que',
+      question: 'Quien hace reir mas al otro con ocurrencias o anecdotas diarias?',
       optionsBuilder: (u1, u2) => [
-        '¡$u1 siempre tiene antojitos! 🍓',
-        '¡$u2 asalta el refrigerador! 🍰',
-        '¡Los dos compartimos comida! 🍫',
-        '¡Garabu exige su banquete! 🍇',
+        '$u1 siempre saca carcajadas',
+        '$u2 tiene un humor increible',
+        'Nos complementamos y reimos juntos',
+        'Ambos somos muy serios en el fondo',
       ],
-      bonusPoints: 20,
     ),
-    TriviaQuestion(
-      category: '🐾 Curiosidad Garabu',
-      question: '¿Qué sucede si Garabu no duerme en toda la noche?',
+    TriviaQuestionData(
+      category: 'Planes y momentos',
+      question: 'Cual seria el plan ideal para una tarde tranquila juntos?',
       optionsBuilder: (u1, u2) => [
-        '¡Se le baja la energía y puede enfermar! 🤒',
-        '¡Se vuelve una estrella del rock! 🎸',
-        '¡Aprende a cocinar galletitas! 🍪',
-        '¡Le crecen alitas de mariposa! 🦋',
+        'Ver series o peliculas con comida rica',
+        'Pasear al aire libre o tomar un cafe',
+        'Cocinar algo nuevo y escuchar musica',
+        'Descansar y jugar con Garabu',
       ],
-      bonusPoints: 25,
     ),
-    TriviaQuestion(
-      category: '💑 ¿Quién es más...?',
-      question: '¿Quién es más cariñoso y da más abrazos durante el día?',
+    TriviaQuestionData(
+      category: 'Planes y momentos',
+      question: 'Si pudieran hacer una escapada de fin de semana, que preferirian?',
       optionsBuilder: (u1, u2) => [
-        '¡$u1 es puro amor y abrazos! 💕',
-        '¡$u2 no me suelta nunca! 🤗',
-        '¡Empate técnico de mimos! 💏',
-        '¡Garabu nos abraza a ambos! 🐾',
+        'Cabaña acogedora en clima frio o montaña',
+        'Playa con sol y brisa marina',
+        'Pueblo magico con buena gastronomia',
+        'Quedarse en casa sin alarmas ni pendientes',
       ],
-      bonusPoints: 20,
     ),
-    TriviaQuestion(
-      category: '💌 Recuerdos de Pareja',
-      question: '¿Quién recuerda más los detalles y fechas especiales?',
+    TriviaQuestionData(
+      category: 'Gustos y estilo',
+      question: 'Al momento de pedir comida para compartir, como deciden?',
       optionsBuilder: (u1, u2) => [
-        '¡$u1 tiene memoria de elefante! 📅',
-        '¡$u2 lleva la cuenta exacta! 🧠',
-        '¡El buzón de Garabu nos ayuda! 💌',
-        '¡Lo celebramos todos los días! ✨',
+        'Uno propone y el otro acepta de inmediato',
+        'Tardamos un buen rato debatiendo opciones',
+        'Pedimos dos cosas distintas para probar ambas',
+        'Siempre terminamos pidiendo lo clasico',
       ],
-      bonusPoints: 25,
     ),
-    TriviaQuestion(
-      category: '🐾 Moda Garabu',
-      question: '¿Cuántas prendas y accesorios puede tener equipados Garabu al mismo tiempo?',
+    TriviaQuestionData(
+      category: 'Mundo de Garabu',
+      question: 'Que creen que prefiere Garabu antes de ir a dormir?',
       optionsBuilder: (u1, u2) => [
-        '¡Hasta 5 prendas fabulosas! 👑',
-        '¡Solo una camisa! 👕',
-        '¡100 sombreros a la vez! 🎩',
-        '¡Ninguna, le gusta estar libre! 🍃',
+        'Que le apaguen la luz y le den mimos',
+        'Un snack o frutita de media noche',
+        'Estar equipado con sus mejores accesorios',
+        'Una partida rapida para gastar energia',
       ],
-      bonusPoints: 30,
     ),
-    TriviaQuestion(
-      category: '💑 ¿Quién es más...?',
-      question: '¿Quién hace reír más al otro con ocurrencias o bromas?',
+    TriviaQuestionData(
+      category: 'Mundo de Garabu',
+      question: 'Cual es el mayor secreto para mantener la racha de dias juntos?',
       optionsBuilder: (u1, u2) => [
-        '¡$u1 es el comediante oficial! 😂',
-        '¡$u2 me mata de risa siempre! 🤣',
-        '¡Nos reímos de puras tonterías juntos! 💖',
-        '¡Las caras que hace Garabu! 🤪',
+        'Entrar a diario y saludarse con caricias',
+        'Compartir tiempo y enviarse cartitas',
+        'Comprar accesorios y vestir al personaje',
+        'Ganar monedas en la sala de juegos',
       ],
-      bonusPoints: 20,
+    ),
+    TriviaQuestionData(
+      category: 'Quien es mas probable que',
+      question: 'Quien propone primero iniciar una nueva aventura o proyecto?',
+      optionsBuilder: (u1, u2) => [
+        '$u1 toma la iniciativa',
+        '$u2 es quien tiene las ideas',
+        'Casi siempre surge en conversaciones mutuas',
+        'Lo pensamos mucho antes de actuar',
+      ],
+    ),
+    TriviaQuestionData(
+      category: 'Gustos y estilo',
+      question: 'Que musica disfrutan mas escuchar cuando estan juntos en el auto o casa?',
+      optionsBuilder: (u1, u2) => [
+        'Pop o musica tranquila en español',
+        'Rock o clasicos para cantar fuerte',
+        'Reggaeton o ritmos para bailar',
+        'Listas variadas y lo que salga en aleatorio',
+      ],
     ),
   ];
 
@@ -173,92 +175,173 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
     super.initState();
     _bounceController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 500),
     );
-    _heartController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-
-    _initRound();
-  }
-
-  void _initRound() {
-    final shuffled = List<TriviaQuestion>.from(_allQuestions)..shuffle(_random);
-    _roundQuestions = shuffled.take(5).toList();
-    _currentIndex = 0;
-    _score = 0;
-    _selectedOptionIndex = null;
-    _isRoundFinished = false;
   }
 
   @override
   void dispose() {
     _bounceController.dispose();
-    _heartController.dispose();
     super.dispose();
   }
 
-  void _onSelectOption(int index) {
-    if (_selectedOptionIndex != null) return; // Evitar doble click
+  String _getCurrentUserId() {
+    final authUser = ref.read(currentUserProvider);
+    return authUser?.id ?? widget.couple?.user1Id ?? 'user_1';
+  }
+
+  String _getPartnerUserId() {
+    final currentId = _getCurrentUserId();
+    if (widget.couple == null) return 'user_2';
+    return widget.couple!.user1Id == currentId
+        ? (widget.couple!.user2Id ?? 'user_2')
+        : widget.couple!.user1Id;
+  }
+
+  Map<String, dynamic> _getOrCreateTriviaRound(CoupleModel couple) {
+    if (couple.activeTrivia != null &&
+        couple.activeTrivia!['questionIndices'] is List &&
+        (couple.activeTrivia!['questionIndices'] as List).length == 5) {
+      return Map<String, dynamic>.from(couple.activeTrivia!);
+    }
+
+    // Generar nueva ronda con 5 preguntas aleatorias del banco
+    final indices = List.generate(questionBank.length, (i) => i)..shuffle(_random);
+    final selectedIndices = indices.take(5).toList();
+
+    return {
+      'roundId': 'trivia_${DateTime.now().millisecondsSinceEpoch}',
+      'questionIndices': selectedIndices,
+      'answers': <String, dynamic>{},
+      'status': 'active',
+      'createdAt': DateTime.now().toIso8601String(),
+    };
+  }
+
+  Future<void> _submitAnswers(Map<String, dynamic> activeTrivia) async {
+    if (widget.couple == null) return;
+    final currentUserId = _getCurrentUserId();
+    final partnerUserId = _getPartnerUserId();
+
+    final answersMap = Map<String, dynamic>.from(activeTrivia['answers'] ?? {});
+    answersMap[currentUserId] = _myAnswers;
+    activeTrivia['answers'] = answersMap;
+
+    final partnerAnswers = answersMap[partnerUserId] as List<dynamic>?;
+    final bothCompleted = partnerAnswers != null && partnerAnswers.length == 5;
+
+    if (bothCompleted) {
+      activeTrivia['status'] = 'completed';
+      // Calcular coincidencias (Match)
+      int matches = 0;
+      for (int i = 0; i < 5; i++) {
+        if (_myAnswers[i] == partnerAnswers[i]) {
+          matches++;
+        }
+      }
+      activeTrivia['matches'] = matches;
+
+      // Recompensas: Monedas, EXP y Felicidad
+      final earnedCoins = 15 + (matches * 5);
+      final petRepo = ref.read(petRepositoryProvider);
+      await petRepo.addCoins(petId: widget.pet.id, amount: earnedCoins);
+      await petRepo.petAnimal(petId: widget.pet.id);
+      await petRepo.addExperience(petId: widget.pet.id, expDelta: 50);
+
+      // Guardar récord
+      await ref.read(lobbyRepositoryProvider).recordGameScore(
+            coupleId: widget.couple!.id,
+            gameKey: 'trivia_pareja',
+            userId: currentUserId,
+            score: matches * 20,
+          );
+    }
+
+    await ref.read(lobbyRepositoryProvider).updateActiveTrivia(
+          coupleId: widget.couple!.id,
+          triviaData: activeTrivia,
+        );
+  }
+
+  Future<void> _startNewRound() async {
+    if (widget.couple == null) return;
+    final indices = List.generate(questionBank.length, (i) => i)..shuffle(_random);
+    final selectedIndices = indices.take(5).toList();
+
+    final newTrivia = {
+      'roundId': 'trivia_${DateTime.now().millisecondsSinceEpoch}',
+      'questionIndices': selectedIndices,
+      'answers': <String, dynamic>{},
+      'status': 'active',
+      'createdAt': DateTime.now().toIso8601String(),
+    };
 
     setState(() {
-      _selectedOptionIndex = index;
-      _score += _roundQuestions[_currentIndex].bonusPoints;
+      _currentIndex = 0;
+      _selectedOptionIndex = null;
+      _myAnswers.clear();
     });
 
-    // Salto feliz de Garabu
+    await ref.read(lobbyRepositoryProvider).updateActiveTrivia(
+          coupleId: widget.couple!.id,
+          triviaData: newTrivia,
+        );
+  }
+
+  void _onOptionChosen(int optionIdx, Map<String, dynamic> activeTrivia) {
+    if (_selectedOptionIndex != null) return;
+
+    setState(() {
+      _selectedOptionIndex = optionIdx;
+      _myAnswers.add(optionIdx);
+    });
+
     _bounceController.forward(from: 0.0);
 
-    // Pequeño retardo para avanzar automáticamente
-    Future.delayed(const Duration(milliseconds: 950), () {
+    Future.delayed(const Duration(milliseconds: 600), () async {
       if (!mounted) return;
-      if (_currentIndex + 1 < _roundQuestions.length) {
+      if (_currentIndex + 1 < 5) {
         setState(() {
           _currentIndex++;
           _selectedOptionIndex = null;
         });
       } else {
-        _finishRound();
+        await _submitAnswers(activeTrivia);
+        if (mounted) setState(() {});
       }
     });
-  }
-
-  Future<void> _finishRound() async {
-    setState(() {
-      _isRoundFinished = true;
-    });
-
-    try {
-      final petRepo = ref.read(petRepositoryProvider);
-      // Recompensas: Monedas, Felicidad completa y +50 EXP
-      final coinsEarned = max(18, (_score / 4).round());
-      await petRepo.addCoins(petId: widget.pet.id, amount: coinsEarned);
-      await petRepo.petAnimal(petId: widget.pet.id);
-      await petRepo.addExperience(petId: widget.pet.id, expDelta: 50);
-
-      // Guardar récord de pareja
-      if (widget.couple != null) {
-        final authUser = ref.read(currentUserProvider);
-        final userId = authUser?.id ?? widget.couple!.user1Id;
-        await ref.read(lobbyRepositoryProvider).recordGameScore(
-              coupleId: widget.couple!.id,
-              gameKey: 'trivia_pareja',
-              userId: userId,
-              score: _score,
-            );
-      }
-    } catch (_) {}
   }
 
   @override
   Widget build(BuildContext context) {
-    final u1 = widget.couple?.user1Name ?? 'Uno';
-    final u2 = widget.couple?.user2Name ?? 'El otro';
+    final coupleAsync = widget.couple != null
+        ? ref.watch(currentCoupleProvider(widget.couple!.id))
+        : null;
+    final currentCouple = coupleAsync?.value ?? widget.couple;
 
-    // Récords existentes
-    final recU1 = widget.couple?.gameRecords['trivia_pareja_${widget.couple?.user1Id}'] ?? 0;
-    final recU2 = widget.couple?.gameRecords['trivia_pareja_${widget.couple?.user2Id}'] ?? 0;
+    final u1 = currentCouple?.user1Name ?? 'Pareja 1';
+    final u2 = currentCouple?.user2Name ?? 'Pareja 2';
+    final currentUserId = _getCurrentUserId();
+    final partnerUserId = _getPartnerUserId();
+    final partnerName = currentUserId == currentCouple?.user1Id ? u2 : u1;
+
+    if (currentCouple == null) {
+      return const Scaffold(
+        body: Center(child: Text('Cargando trivia...')),
+      );
+    }
+
+    final activeTrivia = _getOrCreateTriviaRound(currentCouple);
+    final answersMap = (activeTrivia['answers'] as Map<dynamic, dynamic>?) ?? {};
+    final mySubmittedAnswers = answersMap[currentUserId] as List<dynamic>?;
+    final partnerSubmittedAnswers = answersMap[partnerUserId] as List<dynamic>?;
+
+    final iHaveFinished = mySubmittedAnswers != null && mySubmittedAnswers.length == 5;
+    final partnerHasFinished = partnerSubmittedAnswers != null && partnerSubmittedAnswers.length == 5;
+
+    // Récords mutuos
+    final recU1 = currentCouple.gameRecords['trivia_pareja_${currentCouple.user1Id}'] ?? 0;
+    final recU2 = currentCouple.gameRecords['trivia_pareja_${currentCouple.user2Id}'] ?? 0;
 
     return Scaffold(
       backgroundColor: GarabuTheme.background,
@@ -266,7 +349,7 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
         child: SafeArea(
           child: Column(
             children: [
-              // Barra superior
+              // Barra superior limpia sin emojis
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Row(
@@ -280,7 +363,7 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Trivia de Pareja 💑',
+                            'Trivia de Pareja',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -288,107 +371,49 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
                             ),
                           ),
                           Text(
-                            '¡Descubran su complicidad y ganen EXP!',
+                            'Respondan por separado y descubran sus coincidencias',
                             style: TextStyle(fontSize: 11, color: GarabuTheme.textSecondary),
                           ),
                         ],
                       ),
                     ),
-                    // Puntos acumulados en la ronda
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFF3E0),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFFFB74D)),
+                        color: GarabuTheme.paperWhite,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: GarabuTheme.warmSand),
                       ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.favorite_rounded, color: Color(0xFFE91E63), size: 16),
-                          const SizedBox(width: 4),
-                          Text(
-                            '$_score pts',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFD81B60)),
-                          ),
-                        ],
+                      child: Text(
+                        'Récords: $recU1 | $recU2',
+                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
                       ),
                     ),
                   ],
                 ),
               ),
 
-              // Chip de récords mutuos de pareja
-              if (widget.couple != null)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: GarabuTheme.paperWhite.withValues(alpha: 0.9),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: GarabuTheme.warmSand.withValues(alpha: 0.8)),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.emoji_events_rounded, color: Color(0xFFFFA000), size: 16),
-                        const SizedBox(width: 6),
-                        Text(
-                          '$u1: $recU1 pts  |  $u2: $recU2 pts',
-                          style: const TextStyle(
-                            fontSize: 11.5,
-                            fontWeight: FontWeight.w600,
-                            color: GarabuTheme.deepEspresso,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Barra de progreso de preguntas
-              if (!_isRoundFinished)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                  child: Column(
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(
-                            'Pregunta ${_currentIndex + 1} de ${_roundQuestions.length}',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
-                          ),
-                          AnimatedBuilder(
-                            animation: _heartController,
-                            builder: (context, _) {
-                              return Transform.scale(
-                                scale: 1.0 + (_heartController.value * 0.15),
-                                child: const Icon(Icons.favorite, color: Color(0xFFE91E63), size: 18),
-                              );
-                            },
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(6),
-                        child: LinearProgressIndicator(
-                          value: (_currentIndex + 1) / _roundQuestions.length,
-                          backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.4),
-                          valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFE91E63)),
-                          minHeight: 7,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-              // Contenido principal: o la ronda activa o la pantalla de resultados
+              // Contenido dinámico según el estado de la ronda
               Expanded(
-                child: _isRoundFinished
-                    ? _buildFinishedView(u1, u2)
-                    : _buildQuestionView(u1, u2),
+                child: () {
+                  if (iHaveFinished && partnerHasFinished) {
+                    // Ambos han terminado: mostrar resultados de coincidencia (Match)
+                    return _buildMatchResultsView(
+                      currentCouple,
+                      activeTrivia,
+                      mySubmittedAnswers,
+                      partnerSubmittedAnswers,
+                      u1,
+                      u2,
+                    );
+                  } else if (iHaveFinished && !partnerHasFinished) {
+                    // Yo ya terminé, esperando a la pareja
+                    return _buildWaitingPartnerView(partnerName);
+                  } else {
+                    // Jugando la ronda de 5 preguntas
+                    return _buildAnsweringView(activeTrivia, u1, u2);
+                  }
+                }(),
               ),
             ],
           ),
@@ -397,156 +422,93 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
     );
   }
 
-  Widget _buildQuestionView(String u1, String u2) {
-    final currentQ = _roundQuestions[_currentIndex];
+  // Vista 1: Respondiendo las preguntas
+  Widget _buildAnsweringView(Map<String, dynamic> activeTrivia, String u1, String u2) {
+    final questionIndices = (activeTrivia['questionIndices'] as List<dynamic>).cast<int>();
+    final qIndex = questionIndices[_currentIndex];
+    final currentQ = questionBank[qIndex % questionBank.length];
     final options = currentQ.optionsBuilder(u1, u2);
-    final eyeColor = Color(widget.pet.eyesConfig.color);
 
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Column(
         children: [
-          // Garabu animado y reactivo
+          // Progreso
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Pregunta ${_currentIndex + 1} de 5',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
+              ),
+              Text(
+                currentQ.category,
+                style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: GarabuTheme.primaryBrown),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: LinearProgressIndicator(
+              value: (_currentIndex + 1) / 5.0,
+              backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.35),
+              valueColor: const AlwaysStoppedAnimation<Color>(GarabuTheme.primaryBrown),
+              minHeight: 6,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Silueta pequeña de Garabu
           AnimatedBuilder(
             animation: _bounceController,
             builder: (context, child) {
               final val = _bounceController.value;
-              final jumpOffset = sin(val * pi) * -20.0;
-              final squash = 1.0 + sin(val * pi) * 0.08;
+              final jump = sin(val * pi) * -12.0;
               return Transform.translate(
-                offset: Offset(0, jumpOffset),
-                child: Transform.scale(
-                  scaleY: squash,
-                  child: child,
-                ),
+                offset: Offset(0, jump),
+                child: child,
               );
             },
             child: SizedBox(
-              height: 140,
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Círculo decorativo
-                  Container(
-                    width: 130,
-                    height: 130,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFFFCE4EC).withValues(alpha: 0.6),
-                      border: Border.all(color: const Color(0xFFF48FB1).withValues(alpha: 0.5), width: 1.5),
-                    ),
-                  ),
-
-                  // Cuerpo del Garabu
-                  if (widget.pet.bodyImageUrl.isNotEmpty)
-                    GarabuImage(
-                      imageUrl: widget.pet.bodyImageUrl,
-                      width: 110,
-                      height: 110,
-                      fit: BoxFit.contain,
-                    )
-                  else
-                    Container(
-                      width: 90,
-                      height: 90,
-                      decoration: BoxDecoration(
-                        color: GarabuTheme.warmSand.withValues(alpha: 0.5),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Text('🐾', style: TextStyle(fontSize: 40)),
-                      ),
-                    ),
-
-                  // Ojos de Garabu (felices si seleccionó respuesta)
-                  Positioned(
-                    top: 48,
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        EyeWidget(
-                          size: 16,
-                          color: eyeColor,
-                          isLeft: true,
-                          isHappy: _selectedOptionIndex != null,
-                          blinkProgress: 0.0,
-                          lookDirection: Offset.zero,
-                        ),
-                        const SizedBox(width: 18),
-                        EyeWidget(
-                          size: 16,
-                          color: eyeColor,
-                          isLeft: false,
-                          isHappy: _selectedOptionIndex != null,
-                          blinkProgress: 0.0,
-                          lookDirection: Offset.zero,
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Boca sonriente
-                  Positioned(
-                    top: 68,
-                    child: MouthWidget(
-                      isOpen: _selectedOptionIndex != null,
-                      emotion: _selectedOptionIndex != null ? PetEmotion.happy : PetEmotion.neutral,
-                    ),
-                  ),
-                ],
+              width: 100,
+              height: 100,
+              child: GarabuImage(
+                imageUrl: widget.pet.bodyImageUrl,
+                fit: BoxFit.contain,
               ),
             ),
           ),
           const SizedBox(height: 14),
 
-          // Tarjeta de la Pregunta
+          // Tarjeta de la Pregunta (Limpia, tipografía cuidada sin emojis)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
             decoration: BoxDecoration(
               color: GarabuTheme.paperWhite,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: const Color(0xFFE91E63).withValues(alpha: 0.3), width: 1.8),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: GarabuTheme.warmSand, width: 1.5),
               boxShadow: [
                 BoxShadow(
-                  color: const Color(0xFFE91E63).withValues(alpha: 0.06),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                  color: Colors.black.withValues(alpha: 0.03),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
                 ),
               ],
             ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFCE4EC),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    currentQ.category,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFFC2185B),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  currentQ.question,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: GarabuTheme.deepEspresso,
-                    height: 1.3,
-                  ),
-                ),
-              ],
+            child: Text(
+              currentQ.question,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: GarabuTheme.deepEspresso,
+                height: 1.35,
+              ),
             ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
 
           // Opciones de respuesta
           Column(
@@ -557,58 +519,44 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
                 child: SizedBox(
                   width: double.infinity,
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 250),
-                    curve: Curves.easeInOut,
+                    duration: const Duration(milliseconds: 180),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? const Color(0xFFFCE4EC)
+                          ? GarabuTheme.primaryBrown.withValues(alpha: 0.1)
                           : GarabuTheme.paperWhite,
-                      borderRadius: BorderRadius.circular(18),
+                      borderRadius: BorderRadius.circular(16),
                       border: Border.all(
-                        color: isSelected
-                            ? const Color(0xFFE91E63)
-                            : GarabuTheme.warmSand.withValues(alpha: 0.8),
-                        width: isSelected ? 2.2 : 1.2,
+                        color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.warmSand.withValues(alpha: 0.8),
+                        width: isSelected ? 2.0 : 1.2,
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: isSelected
-                              ? const Color(0xFFE91E63).withValues(alpha: 0.15)
-                              : Colors.black.withValues(alpha: 0.02),
-                          blurRadius: isSelected ? 8 : 4,
-                          offset: const Offset(0, 2),
-                        ),
-                      ],
                     ),
                     child: Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        borderRadius: BorderRadius.circular(18),
-                        onTap: () => _onSelectOption(idx),
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => _onOptionChosen(idx, activeTrivia),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                           child: Row(
                             children: [
                               Container(
-                                width: 28,
-                                height: 28,
+                                width: 26,
+                                height: 26,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: isSelected
-                                      ? const Color(0xFFE91E63)
-                                      : GarabuTheme.warmSand.withValues(alpha: 0.25),
+                                      ? GarabuTheme.primaryBrown
+                                      : GarabuTheme.warmSand.withValues(alpha: 0.3),
                                 ),
                                 child: Center(
-                                  child: isSelected
-                                      ? const Icon(Icons.favorite_rounded, color: Colors.white, size: 16)
-                                      : Text(
-                                          String.fromCharCode(65 + idx),
-                                          style: const TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                            color: GarabuTheme.deepEspresso,
-                                          ),
-                                        ),
+                                  child: Text(
+                                    String.fromCharCode(65 + idx),
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold,
+                                      color: isSelected ? Colors.white : GarabuTheme.deepEspresso,
+                                    ),
+                                  ),
                                 ),
                               ),
                               const SizedBox(width: 12),
@@ -618,9 +566,7 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
                                   style: TextStyle(
                                     fontSize: 14,
                                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                                    color: isSelected
-                                        ? const Color(0xFFC2185B)
-                                        : GarabuTheme.deepEspresso,
+                                    color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.deepEspresso,
                                   ),
                                 ),
                               ),
@@ -639,9 +585,8 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
     );
   }
 
-  Widget _buildFinishedView(String u1, String u2) {
-    final earnedCoins = max(18, (_score / 4).round());
-
+  // Vista 2: En espera de que la pareja responda
+  Widget _buildWaitingPartnerView(String partnerName) {
     return Center(
       child: SingleChildScrollView(
         padding: const EdgeInsets.all(24),
@@ -650,154 +595,257 @@ class _TriviaParejaScreenState extends ConsumerState<TriviaParejaScreen>
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
             color: GarabuTheme.paperWhite,
-            borderRadius: BorderRadius.circular(28),
-            border: Border.all(color: const Color(0xFFE91E63), width: 2),
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: GarabuTheme.warmSand, width: 1.8),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFFE91E63).withValues(alpha: 0.12),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
             ],
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text('🎉', style: TextStyle(fontSize: 48)),
-              const SizedBox(height: 6),
+              SizedBox(
+                width: 110,
+                height: 110,
+                child: GarabuImage(
+                  imageUrl: widget.pet.bodyImageUrl,
+                  fit: BoxFit.contain,
+                ),
+              ),
+              const SizedBox(height: 16),
               const Text(
-                '¡Ronda Completada!',
+                'Tus respuestas han sido guardadas',
+                textAlign: TextAlign.center,
                 style: TextStyle(
-                  fontSize: 22,
+                  fontSize: 17,
                   fontWeight: FontWeight.bold,
                   color: GarabuTheme.deepEspresso,
                 ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                '¡$u1 y $u2 tienen una conexión mágica!',
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: GarabuTheme.warmSand.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Text(
+                  'En espera de que $partnerName responda...',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w600,
+                    color: GarabuTheme.primaryBrown,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'En cuanto ambos hayan respondido la misma ronda de preguntas, podran entrar aqui para ver en cuantas hicieron coincidencia.',
                 textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 13, color: GarabuTheme.textSecondary),
+                style: TextStyle(fontSize: 12.5, color: GarabuTheme.textSecondary, height: 1.35),
               ),
-              const SizedBox(height: 20),
-
-              // Puntos obtenidos y porcentaje de amor
-              Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFCE4EC),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Column(
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Icon(Icons.favorite_rounded, color: Color(0xFFE91E63), size: 28),
-                        const SizedBox(width: 8),
-                        Text(
-                          '$_score Puntos de Amor',
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFC2185B),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    const Text(
-                      '100% Amor y Complicidad Cósmica ✨',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFAD1457)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 18),
-
-              // Recompensas ganadas
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF8E1),
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFFFD54F)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.monetization_on_rounded, color: Color(0xFFFFA000), size: 20),
-                        const SizedBox(width: 4),
-                        Text(
-                          '+$earnedCoins',
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFFE65100)),
-                        ),
-                      ],
-                    ),
-                    const Row(
-                      children: [
-                        Icon(Icons.star_rounded, color: Color(0xFF43A047), size: 20),
-                        SizedBox(width: 4),
-                        Text(
-                          '+50 EXP',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF2E7D32)),
-                        ),
-                      ],
-                    ),
-                    const Row(
-                      children: [
-                        Icon(Icons.mood_rounded, color: Color(0xFFE91E63), size: 20),
-                        SizedBox(width: 4),
-                        Text(
-                          'Felicidad ❤️',
-                          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFFC2185B)),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // Botones de acción
+              const SizedBox(height: 22),
               SizedBox(
                 width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    setState(() {
-                      _initRound();
-                    });
-                  },
-                  icon: const Icon(Icons.replay_rounded, size: 20),
-                  label: const Text('Jugar Otra Ronda', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: ElevatedButton(
+                  onPressed: () => Navigator.of(context).pop(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFE91E63),
+                    backgroundColor: GarabuTheme.primaryBrown,
                     foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     padding: const EdgeInsets.symmetric(vertical: 13),
                   ),
-                ),
-              ),
-              const SizedBox(height: 10),
-              SizedBox(
-                width: double.infinity,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text(
-                    'Volver con Garabu',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: GarabuTheme.textSecondary,
-                    ),
-                  ),
+                  child: const Text('Volver a Casa', style: TextStyle(fontWeight: FontWeight.bold)),
                 ),
               ),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  // Vista 3: Resultados de Match entre ambos
+  Widget _buildMatchResultsView(
+    CoupleModel couple,
+    Map<String, dynamic> activeTrivia,
+    List<dynamic> myAnswers,
+    List<dynamic> partnerAnswers,
+    String u1,
+    String u2,
+  ) {
+    final questionIndices = (activeTrivia['questionIndices'] as List<dynamic>).cast<int>();
+    final currentUserId = _getCurrentUserId();
+    final user1Answers = currentUserId == couple.user1Id ? myAnswers : partnerAnswers;
+    final user2Answers = currentUserId == couple.user1Id ? partnerAnswers : myAnswers;
+
+    int matchCount = 0;
+    for (int i = 0; i < 5; i++) {
+      if (user1Answers[i] == user2Answers[i]) {
+        matchCount++;
+      }
+    }
+    final matchPercent = (matchCount / 5.0 * 100).round();
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        children: [
+          // Resumen de Coincidencias
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: GarabuTheme.paperWhite,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: GarabuTheme.primaryBrown, width: 2),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'Resultados de Coincidencia',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: GarabuTheme.deepEspresso,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$matchCount de 5 respuestas coincidieron ($matchPercent% Match)',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: GarabuTheme.primaryBrown,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: const Color(0xFFFFD54F)),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      Text(
+                        '+${15 + (matchCount * 5)} Monedas',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFFE65100)),
+                      ),
+                      const Text(
+                        '+50 EXP',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFF2E7D32)),
+                      ),
+                      const Text(
+                        'Felicidad al 100%',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12.5, color: Color(0xFFC2185B)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // Desglose de cada una de las 5 preguntas
+          ...List.generate(5, (idx) {
+            final qIndex = questionIndices[idx];
+            final q = questionBank[qIndex % questionBank.length];
+            final options = q.optionsBuilder(u1, u2);
+            final ans1 = user1Answers[idx] as int;
+            final ans2 = user2Answers[idx] as int;
+            final isMatch = ans1 == ans2;
+
+            return Container(
+              margin: const EdgeInsets.only(bottom: 12),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: isMatch ? const Color(0xFFE8F5E9) : GarabuTheme.paperWhite,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: isMatch ? const Color(0xFF81C784) : GarabuTheme.warmSand.withValues(alpha: 0.8),
+                  width: isMatch ? 1.8 : 1.0,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isMatch ? const Color(0xFF2E7D32) : GarabuTheme.textSecondary,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          isMatch ? 'COINCIDENCIA' : 'DIFERENTES',
+                          style: const TextStyle(color: Colors.white, fontSize: 9.5, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        'Pregunta ${idx + 1}',
+                        style: const TextStyle(fontSize: 11, color: GarabuTheme.textSecondary),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    q.question,
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
+                  ),
+                  const SizedBox(height: 8),
+                  if (isMatch)
+                    Text(
+                      'Ambos eligieron: ${options[ans1]}',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32)),
+                    )
+                  else ...[
+                    Text('$u1: ${options[ans1]}', style: const TextStyle(fontSize: 12, color: GarabuTheme.deepEspresso)),
+                    const SizedBox(height: 2),
+                    Text('$u2: ${options[ans2]}', style: const TextStyle(fontSize: 12, color: GarabuTheme.deepEspresso)),
+                  ],
+                ],
+              ),
+            );
+          }),
+
+          const SizedBox(height: 12),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton(
+              onPressed: _startNewRound,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: GarabuTheme.primaryBrown,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+              ),
+              child: const Text('Iniciar Nueva Ronda de Trivia', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Volver a Casa', style: TextStyle(color: GarabuTheme.textSecondary)),
+          ),
+        ],
       ),
     );
   }

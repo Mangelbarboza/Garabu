@@ -215,12 +215,12 @@ class _BatallaCosquillasScreenState extends ConsumerState<BatallaCosquillasScree
       });
     }
 
-    // Comprobar colisión con cada pulguita (hit radius ~0.14)
+    // Comprobar colisión precisa por toque/click individual
     final hitIndices = <int>[];
     for (int i = 0; i < _fleas.length; i++) {
       final flea = _fleas[i];
       final dist = (flea.normalizedPos - normalizedTouch).distance;
-      if (dist < 0.15) {
+      if (dist < 0.12) {
         hitIndices.add(i);
       }
     }
@@ -643,7 +643,7 @@ class _BatallaCosquillasScreenState extends ConsumerState<BatallaCosquillasScree
 
                 const SizedBox(height: 10),
                 const Text(
-                  '¡Rasquea o acaricia rápido sobre las pulguitas para hacerle cosquillas!',
+                  '¡Haz click o toca directamente sobre cada pulguita para atraparla!',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,
@@ -659,7 +659,6 @@ class _BatallaCosquillasScreenState extends ConsumerState<BatallaCosquillasScree
                     child: Listener(
                       behavior: HitTestBehavior.opaque,
                       onPointerDown: (e) => _handleScratchAt(e.position),
-                      onPointerMove: (e) => _handleScratchAt(e.position),
                       child: AnimatedBuilder(
                         animation: _wiggleController,
                         builder: (context, child) {

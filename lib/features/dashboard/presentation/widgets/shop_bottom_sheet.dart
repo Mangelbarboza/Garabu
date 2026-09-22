@@ -63,21 +63,24 @@ const List<CatalogBackground> kCatalogBackgrounds = [
 
 class ShopBottomSheet extends ConsumerStatefulWidget {
   final PetModel pet;
+  final int initialTab;
 
   const ShopBottomSheet({
     super.key,
     required this.pet,
+    this.initialTab = 0,
   });
 
   static void show({
     required BuildContext context,
     required PetModel pet,
+    int initialTab = 0,
   }) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (_) => ShopBottomSheet(pet: pet),
+      builder: (_) => ShopBottomSheet(pet: pet, initialTab: initialTab),
     );
   }
 
@@ -86,9 +89,15 @@ class ShopBottomSheet extends ConsumerStatefulWidget {
 }
 
 class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
-  int _selectedTab = 0; // 0 = Comida, 1 = Ropa, 2 = Fondos
+  late int _selectedTab;
   ClothingCategory _selectedClothingCat = ClothingCategory.bows;
   String? _animatingItemKey;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedTab = widget.initialTab;
+  }
 
   Future<void> _onBuyItem(String key, int price) async {
     setState(() => _animatingItemKey = key);

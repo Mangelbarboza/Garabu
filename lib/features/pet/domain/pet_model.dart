@@ -95,6 +95,8 @@ class GarmentItem {
   final DateTime createdAt;
   final double offsetX;
   final double offsetY;
+  final double scale;
+  final double rotation;
 
   const GarmentItem({
     required this.id,
@@ -104,6 +106,8 @@ class GarmentItem {
     required this.createdAt,
     this.offsetX = 0.0,
     this.offsetY = 0.0,
+    this.scale = 1.0,
+    this.rotation = 0.0,
   });
 
   Map<String, dynamic> toMap() {
@@ -115,6 +119,8 @@ class GarmentItem {
       'createdAt': createdAt.toIso8601String(),
       'offsetX': offsetX,
       'offsetY': offsetY,
+      'scale': scale,
+      'rotation': rotation,
     };
   }
 
@@ -129,6 +135,8 @@ class GarmentItem {
           : DateTime.now(),
       offsetX: (map['offsetX'] as num?)?.toDouble() ?? 0.0,
       offsetY: (map['offsetY'] as num?)?.toDouble() ?? 0.0,
+      scale: (map['scale'] as num?)?.toDouble() ?? 1.0,
+      rotation: (map['rotation'] as num?)?.toDouble() ?? 0.0,
     );
   }
 
@@ -140,6 +148,8 @@ class GarmentItem {
     DateTime? createdAt,
     double? offsetX,
     double? offsetY,
+    double? scale,
+    double? rotation,
   }) {
     return GarmentItem(
       id: id ?? this.id,
@@ -149,6 +159,8 @@ class GarmentItem {
       createdAt: createdAt ?? this.createdAt,
       offsetX: offsetX ?? this.offsetX,
       offsetY: offsetY ?? this.offsetY,
+      scale: scale ?? this.scale,
+      rotation: rotation ?? this.rotation,
     );
   }
 }
@@ -178,6 +190,7 @@ class PetModel {
   final bool isSleeping;
   final int level;
   final int experience;
+  final double energyValue;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -213,6 +226,7 @@ class PetModel {
     this.sleepStartedAt,
     this.lastSleptAt,
     this.isSleeping = false,
+    this.energyValue = 1.0,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -251,18 +265,20 @@ class PetModel {
     return (1.0 - (diffHours / 6.0)).clamp(0.05, 1.0);
   }
 
-  /// La energía aguanta 1 día entero (~4.75% por hora despierto, ~5% a las 20h)
-  /// y se recarga durante la noche (~7.5h de sueño para el 100%)
+  /// La energía continua:
+  /// - Despierto: decae suavemente (~1 día completo para agotarse, ~4.5% por hora)
+  /// - Dormido: se recarga continuamente desde el nivel en que se durmió (+12.5% por hora, ~8h para 100%)
   double get energy {
     if (isSleeping) {
       final sleepTime = sleepStartedAt ?? createdAt;
       final sleptHours = DateTime.now().difference(sleepTime).inMinutes / 60.0;
-      final recovery = (sleptHours / 7.5).clamp(0.0, 1.0);
-      return (0.05 + (recovery * 0.95)).clamp(0.05, 1.0);
+      final gained = (sleptHours / 8.0).clamp(0.0, 1.0);
+      return (energyValue + gained).clamp(0.05, 1.0);
     } else {
       final wakeTime = lastSleptAt ?? createdAt;
       final awakeHours = DateTime.now().difference(wakeTime).inMinutes / 60.0;
-      return (1.0 - (awakeHours * 0.0475)).clamp(0.04, 1.0);
+      final lost = awakeHours / 22.0;
+      return (energyValue - lost).clamp(0.05, 1.0);
     }
   }
 
@@ -311,6 +327,7 @@ class PetModel {
       'sleepStartedAt': sleepStartedAt?.toIso8601String(),
       'lastSleptAt': lastSleptAt?.toIso8601String(),
       'isSleeping': isSleeping,
+      'energyValue': energyValue,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
@@ -338,7 +355,7 @@ class PetModel {
       resolvedActiveGarmentId ??= 'initial_garment';
     }
 
-    // Soporte para hasta 2 prendas equipadas
+    // Soporte para hasta 5 prendas equipadas
     List<String> rawEquipped = [];
     if (map['equippedGarmentIds'] is List) {
       rawEquipped = (map['equippedGarmentIds'] as List).map((e) => e.toString()).toList();
@@ -371,6 +388,7 @@ class PetModel {
         PetModel.defaultPhrases;
 
     final rawCoins = (map['coins'] as num?)?.toInt() ?? 999;
+    final rawEnergyValue = (map['energyValue'] as num?)?.toDouble() ?? 1.0;
 
     return PetModel(
       id: docId,
@@ -409,6 +427,7 @@ class PetModel {
           ? DateTime.tryParse(map['lastSleptAt'])
           : null,
       isSleeping: map['isSleeping'] as bool? ?? false,
+      energyValue: rawEnergyValue,
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
           : DateTime.now(),
@@ -443,6 +462,7 @@ class PetModel {
     DateTime? sleepStartedAt,
     DateTime? lastSleptAt,
     bool? isSleeping,
+    double? energyValue,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -471,6 +491,7 @@ class PetModel {
       sleepStartedAt: sleepStartedAt ?? this.sleepStartedAt,
       lastSleptAt: lastSleptAt ?? this.lastSleptAt,
       isSleeping: isSleeping ?? this.isSleeping,
+      energyValue: energyValue ?? this.energyValue,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

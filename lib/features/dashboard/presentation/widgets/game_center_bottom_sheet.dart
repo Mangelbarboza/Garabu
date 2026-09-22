@@ -3,6 +3,7 @@ import '../../../../core/theme/garabu_theme.dart';
 import '../../../lobby/domain/couple_model.dart';
 import '../../../minigames/atrapa_garabutos_screen.dart';
 import '../../../minigames/batalla_cosquillas_screen.dart';
+import '../../../minigames/dibuja_adivina_screen.dart';
 import '../../../minigames/trivia_pareja_screen.dart';
 import '../../../pet/domain/pet_model.dart';
 
@@ -593,32 +594,101 @@ class _GameCenterBottomSheetState extends State<GameCenterBottomSheet> {
         ),
         const SizedBox(height: 14),
 
-        // Próximamente en pareja
+        // Tarjeta: Dibuja y Adivina (Pinturillo)
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: GarabuTheme.paperWhite.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: GarabuTheme.warmSand.withValues(alpha: 0.6)),
+            color: GarabuTheme.paperWhite,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(
+              color: const Color(0xFF673AB7),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF673AB7).withValues(alpha: 0.08),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
           ),
-          child: const Row(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.palette_rounded, size: 20, color: GarabuTheme.textSecondary),
-              SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Próximamente: "Dibuja y Adivina"',
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDE7F6),
+                      borderRadius: BorderRadius.circular(10),
                     ),
-                    SizedBox(height: 2),
-                    Text(
-                      'Uno dibuja una pista en el lienzo y el otro debe adivinarla en tiempo real.',
-                      style: TextStyle(fontSize: 11, color: GarabuTheme.textSecondary),
+                    child: const Text(
+                      '¡NUEVO MODO COOPERATIVO!',
+                      style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF512DA8)),
                     ),
-                  ],
+                  ),
+                  const Spacer(),
+                  const Icon(Icons.star_rounded, color: Color(0xFF2E7D32), size: 16),
+                  const SizedBox(width: 4),
+                  const Text('+60 EXP ⭐', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEDE7F6),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: const Color(0xFFB39DDB)),
+                    ),
+                    child: const Center(
+                      child: Icon(Icons.palette_rounded, color: Color(0xFF673AB7), size: 28),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Dibuja y Adivina',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
+                        ),
+                        SizedBox(height: 2),
+                        Text(
+                          '¡Uno dibuja una palabra en el lienzo y su pareja la adivina con pistas de letras!',
+                          style: TextStyle(fontSize: 12, color: GarabuTheme.textSecondary),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => DibujaAdivinaScreen(pet: widget.pet, couple: widget.couple),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.brush_rounded, size: 20),
+                  label: const Text('Jugar Dibuja y Adivina', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF673AB7),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
                 ),
               ),
             ],

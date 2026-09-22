@@ -15,6 +15,8 @@ class CoupleModel {
   final String? activePetId;
   final String status; // 'waiting_partner' | 'drawing_body' | 'drawing_clothes' | 'ready'
   final Map<String, int> gameRecords;
+  final Map<String, dynamic>? activeTrivia;
+  final Map<String, dynamic>? activePinturillo;
   final DateTime createdAt;
 
   const CoupleModel({
@@ -34,6 +36,8 @@ class CoupleModel {
     this.activePetId,
     required this.status,
     this.gameRecords = const {},
+    this.activeTrivia,
+    this.activePinturillo,
     required this.createdAt,
   });
 
@@ -58,6 +62,8 @@ class CoupleModel {
       'activePetId': activePetId ?? petId ?? user1PetId,
       'status': status,
       'gameRecords': gameRecords,
+      'activeTrivia': activeTrivia,
+      'activePinturillo': activePinturillo,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -91,6 +97,12 @@ class CoupleModel {
       activePetId: rawActivePetId,
       status: map['status'] ?? 'waiting_partner',
       gameRecords: rawRecords,
+      activeTrivia: map['activeTrivia'] is Map<String, dynamic>
+          ? map['activeTrivia'] as Map<String, dynamic>
+          : null,
+      activePinturillo: map['activePinturillo'] is Map<String, dynamic>
+          ? map['activePinturillo'] as Map<String, dynamic>
+          : null,
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
           : DateTime.now(),
@@ -114,6 +126,8 @@ class CoupleModel {
     String? activePetId,
     String? status,
     Map<String, int>? gameRecords,
+    Map<String, dynamic>? activeTrivia,
+    Map<String, dynamic>? activePinturillo,
     DateTime? createdAt,
   }) {
     return CoupleModel(
@@ -133,6 +147,8 @@ class CoupleModel {
       activePetId: activePetId ?? this.activePetId,
       status: status ?? this.status,
       gameRecords: gameRecords ?? this.gameRecords,
+      activeTrivia: activeTrivia ?? this.activeTrivia,
+      activePinturillo: activePinturillo ?? this.activePinturillo,
       createdAt: createdAt ?? this.createdAt,
     );
   }

@@ -230,5 +230,98 @@ void main() {
       final fromMap = CoupleModel.fromMap(map, 'cpl_records');
       expect(fromMap.gameRecords['atrapa_garabutos_u2'], 180);
     });
+
+    test('GarmentItem soporta escala y rotacion persistentes', () {
+      final now = DateTime.now();
+      final garment = GarmentItem(
+        id: 'g_transform',
+        name: 'Lentes Cool',
+        imageUrl: 'lentes_img',
+        createdAt: now,
+        offsetX: 12.5,
+        offsetY: -8.0,
+        scale: 1.45,
+        rotation: 0.35,
+      );
+
+      final map = garment.toMap();
+      final recreated = GarmentItem.fromMap(map);
+
+      expect(recreated.id, 'g_transform');
+      expect(recreated.scale, 1.45);
+      expect(recreated.rotation, 0.35);
+      expect(recreated.offsetX, 12.5);
+      expect(recreated.offsetY, -8.0);
+    });
+
+    test('PetModel calcula energia continua usando energyValue', () {
+      final now = DateTime.now();
+      final petAwake = PetModel(
+        id: 'pet_energy',
+        coupleId: 'cpl_1',
+        name: 'Garabu Dormilon',
+        bodyImageUrl: 'url',
+        eyesConfig: const EyesConfig(
+          leftEye: RelativePoint(x: 0.4, y: 0.4),
+          rightEye: RelativePoint(x: 0.6, y: 0.4),
+        ),
+        isSleeping: false,
+        energyValue: 0.85,
+        lastSleptAt: now.subtract(const Duration(hours: 2)), // 2 horas despierto
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      // Decae 5% por hora despierto: 0.85 - (2 * 0.05) = 0.75
+      expect(petAwake.energy, closeTo(0.75, 0.01));
+
+      final petSleeping = petAwake.copyWith(
+        isSleeping: true,
+        energyValue: 0.75,
+        sleepStartedAt: now.subtract(const Duration(hours: 1)), // 1 hora dormido
+      );
+
+      // Sube 12.5% por hora dormido: 0.75 + (1 * 0.125) = 0.875
+      expect(petSleeping.energy, closeTo(0.875, 0.01));
+
+      final map = petSleeping.toMap();
+      final fromMap = PetModel.fromMap(map, 'pet_energy');
+      expect(fromMap.energyValue, 0.75);
+      expect(fromMap.isSleeping, true);
+    });
+
+    test('CoupleModel serializa y deserializa activeTrivia y activePinturillo', () {
+      final now = DateTime.now();
+      final couple = CoupleModel(
+        id: 'cpl_active_games',
+        user1Id: 'u1',
+        user1Name: 'Angel',
+        user2Id: 'u2',
+        user2Name: 'Maria',
+        inviteCode: '777888',
+        streak: 1,
+        lastInteraction: now,
+        status: 'ready',
+        createdAt: now,
+        activeTrivia: {
+          'initiatorId': 'u1',
+          'roundId': 'rnd_1',
+          'user1Answers': [0, 1, 2, 0, 3],
+        },
+        activePinturillo: {
+          'artistId': 'u1',
+          'word': 'CORAZON',
+          'category': 'Amor',
+        },
+      );
+
+      final map = couple.toMap();
+      final fromMap = CoupleModel.fromMap(map, 'cpl_active_games');
+
+      expect(fromMap.activeTrivia?['initiatorId'], 'u1');
+      expect(fromMap.activeTrivia?['roundId'], 'rnd_1');
+      expect(fromMap.activePinturillo?['word'], 'CORAZON');
+      expect(fromMap.activePinturillo?['category'], 'Amor');
+    });
   });
 }

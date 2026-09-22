@@ -155,7 +155,7 @@ class _PetVitalBarsState extends State<PetVitalBars>
           ),
           const SizedBox(height: 7),
           _buildStatRow(
-            label: pet.isSleeping ? 'Cargando...' : 'Energía',
+            label: 'Energía',
             icon: pet.isSleeping ? Icons.bolt_rounded : Icons.bedtime_rounded,
             value: energy,
             barColor: pet.isSleeping ? const Color(0xFFFFD54F) : const Color(0xFFFFB74D),
