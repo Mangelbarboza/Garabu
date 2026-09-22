@@ -17,6 +17,10 @@ class CoupleModel {
   final Map<String, int> gameRecords;
   final Map<String, dynamic>? activeTrivia;
   final Map<String, dynamic>? activePinturillo;
+  final String? user1LastInteractionDate;
+  final String? user2LastInteractionDate;
+  final DateTime? user1LastSeen;
+  final DateTime? user2LastSeen;
   final DateTime createdAt;
 
   const CoupleModel({
@@ -38,11 +42,55 @@ class CoupleModel {
     this.gameRecords = const {},
     this.activeTrivia,
     this.activePinturillo,
+    this.user1LastInteractionDate,
+    this.user2LastInteractionDate,
+    this.user1LastSeen,
+    this.user2LastSeen,
     required this.createdAt,
   });
 
   String? get resolvedUser1PetId => user1PetId ?? petId;
   String? get resolvedActivePetId => activePetId ?? resolvedUser1PetId;
+
+  bool hasUser1InteractedToday([DateTime? now]) {
+    final target = now ?? DateTime.now();
+    final todayStr = '${target.year}-${target.month.toString().padLeft(2, '0')}-${target.day.toString().padLeft(2, '0')}';
+    return user1LastInteractionDate == todayStr;
+  }
+
+  bool hasUser2InteractedToday([DateTime? now]) {
+    final target = now ?? DateTime.now();
+    final todayStr = '${target.year}-${target.month.toString().padLeft(2, '0')}-${target.day.toString().padLeft(2, '0')}';
+    return user2LastInteractionDate == todayStr;
+  }
+
+  bool hasBothInteractedToday([DateTime? now]) {
+    return hasUser1InteractedToday(now) && hasUser2InteractedToday(now);
+  }
+
+  bool isUser1Online([DateTime? now]) {
+    if (user1LastSeen == null) return false;
+    final target = now ?? DateTime.now();
+    return target.difference(user1LastSeen!).inSeconds < 120;
+  }
+
+  bool isUser2Online([DateTime? now]) {
+    if (user2LastSeen == null) return false;
+    final target = now ?? DateTime.now();
+    return target.difference(user2LastSeen!).inSeconds < 120;
+  }
+
+  bool hasUserInteractedToday(String userId, [DateTime? now]) {
+    if (userId == user1Id) return hasUser1InteractedToday(now);
+    if (userId == user2Id) return hasUser2InteractedToday(now);
+    return false;
+  }
+
+  bool isUserOnline(String userId, [DateTime? now]) {
+    if (userId == user1Id) return isUser1Online(now);
+    if (userId == user2Id) return isUser2Online(now);
+    return false;
+  }
 
   Map<String, dynamic> toMap() {
     return {
@@ -64,6 +112,10 @@ class CoupleModel {
       'gameRecords': gameRecords,
       'activeTrivia': activeTrivia,
       'activePinturillo': activePinturillo,
+      'user1LastInteractionDate': user1LastInteractionDate,
+      'user2LastInteractionDate': user2LastInteractionDate,
+      'user1LastSeen': user1LastSeen?.toIso8601String(),
+      'user2LastSeen': user2LastSeen?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -103,6 +155,14 @@ class CoupleModel {
       activePinturillo: map['activePinturillo'] is Map<String, dynamic>
           ? map['activePinturillo'] as Map<String, dynamic>
           : null,
+      user1LastInteractionDate: map['user1LastInteractionDate'] as String?,
+      user2LastInteractionDate: map['user2LastInteractionDate'] as String?,
+      user1LastSeen: map['user1LastSeen'] != null
+          ? DateTime.tryParse(map['user1LastSeen'])
+          : null,
+      user2LastSeen: map['user2LastSeen'] != null
+          ? DateTime.tryParse(map['user2LastSeen'])
+          : null,
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
           : DateTime.now(),
@@ -128,6 +188,10 @@ class CoupleModel {
     Map<String, int>? gameRecords,
     Map<String, dynamic>? activeTrivia,
     Map<String, dynamic>? activePinturillo,
+    String? user1LastInteractionDate,
+    String? user2LastInteractionDate,
+    DateTime? user1LastSeen,
+    DateTime? user2LastSeen,
     DateTime? createdAt,
   }) {
     return CoupleModel(
@@ -149,6 +213,12 @@ class CoupleModel {
       gameRecords: gameRecords ?? this.gameRecords,
       activeTrivia: activeTrivia ?? this.activeTrivia,
       activePinturillo: activePinturillo ?? this.activePinturillo,
+      user1LastInteractionDate:
+          user1LastInteractionDate ?? this.user1LastInteractionDate,
+      user2LastInteractionDate:
+          user2LastInteractionDate ?? this.user2LastInteractionDate,
+      user1LastSeen: user1LastSeen ?? this.user1LastSeen,
+      user2LastSeen: user2LastSeen ?? this.user2LastSeen,
       createdAt: createdAt ?? this.createdAt,
     );
   }

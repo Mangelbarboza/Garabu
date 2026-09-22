@@ -66,6 +66,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   final Random _random = Random();
   int _lastParticleTime = 0;
   int _lastPettedDbTime = 0;
+  Timer? _presenceTimer;
 
   // Desplegable de estadísticas en móviles
   bool _showStatsDrawer = false;
@@ -143,6 +144,37 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ref.read(lobbyRepositoryProvider).verifyAndUpdateDailyStreak(widget.couple.id);
       }
     });
+
+    // 6. Iniciar presencia en tiempo real (puntito verde)
+    _startPresenceHeartbeat();
+  }
+
+  void _startPresenceHeartbeat() {
+    _updatePresence();
+    _presenceTimer?.cancel();
+    _presenceTimer = Timer.periodic(const Duration(seconds: 45), (_) {
+      if (mounted) _updatePresence();
+    });
+  }
+
+  void _updatePresence() {
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      ref.read(lobbyRepositoryProvider).updateUserPresence(
+        coupleId: widget.couple.id,
+        userId: user.id,
+      );
+    }
+  }
+
+  void _triggerInteraction() {
+    final user = ref.read(currentUserProvider);
+    if (user != null) {
+      ref.read(lobbyRepositoryProvider).recordUserInteraction(
+        coupleId: widget.couple.id,
+        userId: user.id,
+      );
+    }
   }
 
   void _scheduleSimultaneousBlink() {
@@ -164,6 +196,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
   @override
   void dispose() {
+    _presenceTimer?.cancel();
     _animController.dispose();
     _squashController.dispose();
     _purrController.dispose();
@@ -240,6 +273,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         if (strokeDoneNow - _lastPettedDbTime > 12000) {
           _lastPettedDbTime = strokeDoneNow;
           ref.read(petRepositoryProvider).petAnimal(petId: pet.id);
+          _triggerInteraction();
         }
 
         _happyResetTimer?.cancel();
@@ -346,6 +380,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     final petRepo = ref.read(petRepositoryProvider);
     await petRepo.feedPet(petId: pet.id, fruitKey: fruit.key);
+    _triggerInteraction();
 
     _spawnSketchParticle(const Offset(160, 160));
     _happyResetTimer?.cancel();
@@ -362,6 +397,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   void _onWaterGiven(PetModel pet) async {
     final petRepo = ref.read(petRepositoryProvider);
     await petRepo.waterPet(petId: pet.id);
+    _triggerInteraction();
 
     setState(() {
       _isPetHappy = true;
@@ -384,6 +420,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     final petRepo = ref.read(petRepositoryProvider);
     final willSleep = !pet.isSleeping;
     await petRepo.toggleSleep(petId: pet.id, isSleeping: willSleep);
+    _triggerInteraction();
 
     setState(() {
       _speechBubbleText = willSleep ? 'Zzz... Buenas noches' : '¡Buenos días!';
@@ -480,22 +517,126 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     return widgets;
   }
 
-  void _showRestoreStreakDialog(BuildContext context, CoupleModel couple) {
+  Widget _buildCoupleStreakHearts(CoupleModel couple) {
+    final hasU1 = couple.hasUser1InteractedToday();
+    final hasU2 = couple.hasUser2InteractedToday();
+    final isU1Online = couple.isUser1Online();
+    final isU2Online = couple.isUser2Online();
+
+    // Color de la racha (fuego naranja si activa, azul hielo si congelada)
+    final streakColor = couple.isStreakFrozen
+        ? const Color(0xFF0288D1)
+        : const Color(0xFFFF7043);
+
+    return InkWell(
+      onTap: () => _showStreakDetailsDialog(context, couple),
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Corazón Persona 1
+            _buildPersonHeart(
+              name: couple.user1Name,
+              hasInteracted: hasU1,
+              isOnline: isU1Online,
+              streakColor: streakColor,
+            ),
+            const SizedBox(width: 8),
+
+            // Corazón Persona 2
+            _buildPersonHeart(
+              name: couple.user2Name ?? 'Pareja',
+              hasInteracted: hasU2,
+              isOnline: isU2Online,
+              streakColor: streakColor,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPersonHeart({
+    required String name,
+    required bool hasInteracted,
+    required bool isOnline,
+    required Color streakColor,
+  }) {
+    return Tooltip(
+      message: '$name: ${hasInteracted ? "Interactuó hoy ❤️" : "Falta interactuar hoy ⏳"}${isOnline ? " (En línea 🟢)" : ""}',
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // Corazón: Se enciende del color de la racha al interactuar hoy, o contorno apagado si no
+          Icon(
+            hasInteracted ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            size: 16,
+            color: hasInteracted ? streakColor : const Color(0xFFBDBDBD),
+          ),
+
+          // Puntito verde al lado del corazón si la persona está dentro de la app en línea
+          if (isOnline)
+            Positioned(
+              right: -3,
+              bottom: -1,
+              child: Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF00E676),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 1),
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFF00E676).withValues(alpha: 0.8),
+                      blurRadius: 3,
+                      spreadRadius: 0.5,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  void _showStreakDetailsDialog(BuildContext context, CoupleModel couple) {
+    final hasU1 = couple.hasUser1InteractedToday();
+    final hasU2 = couple.hasUser2InteractedToday();
+    final isU1Online = couple.isUser1Online();
+    final isU2Online = couple.isUser2Online();
+    final bothDone = couple.hasBothInteractedToday();
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-        title: const Row(
+        title: Row(
           children: [
-            Icon(Icons.ac_unit_rounded, color: Color(0xFF0288D1), size: 28),
-            SizedBox(width: 8),
-            Text(
-              '¡Racha Congelada!',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
-                color: GarabuTheme.deepEspresso,
+            Icon(
+              couple.isStreakFrozen
+                  ? Icons.ac_unit_rounded
+                  : Icons.local_fire_department_rounded,
+              color: couple.isStreakFrozen
+                  ? const Color(0xFF0288D1)
+                  : const Color(0xFFFF7043),
+              size: 26,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                couple.isStreakFrozen
+                    ? 'Racha Congelada (${couple.streak} días)'
+                    : 'Racha de ${couple.streak} días',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 17,
+                  color: GarabuTheme.deepEspresso,
+                ),
               ),
             ),
           ],
@@ -505,66 +646,152 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Parece que se les pasó un día, ¡pero no te preocupes! En Garabu apoyamos el amor constante. '
-              'Puedes descongelar y recuperar tu racha de ${couple.streak} días totalmente GRATIS.',
+              bothDone
+                  ? '¡Excelente! Ambos han interactuado con Garabu hoy y la racha se mantendrá ardiendo con fuerza. 🔥'
+                  : 'Para mantener la racha viva y evitar que se enfríe, ambos miembros de la pareja deben interactuar con la mascota cada día.',
               style: const TextStyle(
-                fontSize: 14,
+                fontSize: 13.5,
                 color: GarabuTheme.deepEspresso,
                 height: 1.4,
               ),
             ),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE1F5FE),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: const Color(0xFF81D4FA)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.favorite_rounded, color: Color(0xFFE91E63), size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Racha guardada: ${couple.streak} días 🔥',
-                      style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF01579B),
+            const SizedBox(height: 14),
+
+            // Estado de Usuario 1
+            _buildPartnerStreakStatusTile(
+              name: couple.user1Name,
+              hasInteracted: hasU1,
+              isOnline: isU1Online,
+            ),
+            const SizedBox(height: 8),
+
+            // Estado de Usuario 2
+            _buildPartnerStreakStatusTile(
+              name: couple.user2Name ?? 'Pareja',
+              hasInteracted: hasU2,
+              isOnline: isU2Online,
+            ),
+
+            if (couple.isStreakFrozen) ...[
+              const SizedBox(height: 14),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE1F5FE),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: const Color(0xFF81D4FA)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: Color(0xFF0288D1), size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'La racha se enfrió porque faltó la interacción de uno de los dos. ¡Puedes descongelarla gratis!',
+                        style: TextStyle(fontSize: 12, color: Color(0xFF01579B)),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
           ],
         ),
         actions: [
+          if (couple.isStreakFrozen)
+            ElevatedButton(
+              onPressed: () async {
+                final messenger = ScaffoldMessenger.of(context);
+                Navigator.of(ctx).pop();
+                await ref.read(lobbyRepositoryProvider).restoreFrozenStreak(couple.id);
+                if (mounted) {
+                  messenger.showSnackBar(
+                    const SnackBar(
+                      content: Text('¡Racha descongelada con éxito! A seguir cuidando de Garabu 🔥'),
+                      backgroundColor: Color(0xFFFF7043),
+                    ),
+                  );
+                }
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFFF7043),
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Descongelar Gratis ✨', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Después', style: TextStyle(color: GarabuTheme.primaryBrown)),
+            child: const Text('Cerrar', style: TextStyle(color: GarabuTheme.primaryBrown)),
           ),
-          ElevatedButton(
-            onPressed: () async {
-              final messenger = ScaffoldMessenger.of(context);
-              Navigator.of(ctx).pop();
-              await ref.read(lobbyRepositoryProvider).restoreFrozenStreak(couple.id);
-              if (mounted) {
-                messenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('¡Racha descongelada con éxito! A seguir cuidando de Garabu 🔥'),
-                    backgroundColor: Color(0xFFFF7043),
-                  ),
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFFF7043),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPartnerStreakStatusTile({
+    required String name,
+    required bool hasInteracted,
+    required bool isOnline,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: hasInteracted
+            ? const Color(0xFFFFF3E0)
+            : GarabuTheme.warmSand.withValues(alpha: 0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: hasInteracted
+              ? const Color(0xFFFFB74D)
+              : GarabuTheme.warmSand.withValues(alpha: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            hasInteracted ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+            size: 18,
+            color: hasInteracted ? const Color(0xFFFF7043) : const Color(0xFF9E9E9E),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              name,
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.bold,
+                color: GarabuTheme.deepEspresso,
+              ),
             ),
-            child: const Text('Restablecer Gratis ✨', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+          if (isOnline) ...[
+            Container(
+              width: 7,
+              height: 7,
+              decoration: const BoxDecoration(
+                color: Color(0xFF00E676),
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Text(
+              'En línea',
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF2E7D32),
+              ),
+            ),
+            const SizedBox(width: 8),
+          ],
+          Text(
+            hasInteracted ? 'Completado hoy 🔥' : 'Falta interactuar ⏳',
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: FontWeight.w600,
+              color: hasInteracted ? const Color(0xFFE65100) : const Color(0xFF757575),
+            ),
           ),
         ],
       ),
@@ -872,59 +1099,78 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                               // 1. Barra Superior Nativa (Racha, Nombre de mascota, Lenguaje, Modo Noche, Editar Cuerpo, Salir)
                               Row(
                                 children: [
-                                  // Racha con fueguito limpio y número o hielo si está congelada
-                                  GestureDetector(
-                                    onTap: currentCouple.isStreakFrozen
-                                        ? () => _showRestoreStreakDialog(context, currentCouple)
-                                        : null,
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                      decoration: BoxDecoration(
-                                        color: currentCouple.isStreakFrozen
-                                            ? const Color(0xFFE1F5FE)
-                                            : Colors.white,
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(
-                                          color: currentCouple.isStreakFrozen
-                                              ? const Color(0xFF0288D1)
-                                              : GarabuTheme.warmSand,
-                                          width: currentCouple.isStreakFrozen ? 1.6 : 1.0,
+                                  // Racha de Pareja: Llama superior + Corazones individuales abajo
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      // Chip de Llama y Racha
+                                      GestureDetector(
+                                        onTap: () => _showStreakDetailsDialog(context, currentCouple),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                                          decoration: BoxDecoration(
+                                            color: currentCouple.isStreakFrozen
+                                                ? const Color(0xFFE1F5FE)
+                                                : Colors.white,
+                                            borderRadius: BorderRadius.circular(16),
+                                            border: Border.all(
+                                              color: currentCouple.isStreakFrozen
+                                                  ? const Color(0xFF0288D1)
+                                                  : (currentCouple.hasBothInteractedToday()
+                                                      ? const Color(0xFFFF7043)
+                                                      : GarabuTheme.warmSand),
+                                              width: currentCouple.isStreakFrozen || currentCouple.hasBothInteractedToday() ? 1.6 : 1.0,
+                                            ),
+                                            boxShadow: [
+                                              if (currentCouple.hasBothInteractedToday() && !currentCouple.isStreakFrozen)
+                                                BoxShadow(
+                                                  color: const Color(0xFFFF7043).withValues(alpha: 0.18),
+                                                  blurRadius: 6,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                            ],
+                                          ),
+                                          child: Row(
+                                            mainAxisSize: MainAxisSize.min,
+                                            children: [
+                                              Icon(
+                                                currentCouple.isStreakFrozen
+                                                    ? Icons.ac_unit_rounded
+                                                    : Icons.local_fire_department_rounded,
+                                                color: currentCouple.isStreakFrozen
+                                                    ? const Color(0xFF0288D1)
+                                                    : const Color(0xFFFF7043),
+                                                size: 17,
+                                              ),
+                                              const SizedBox(width: 4),
+                                              Text(
+                                                '${currentCouple.streak}',
+                                                style: TextStyle(
+                                                  fontSize: 13.5,
+                                                  fontWeight: FontWeight.bold,
+                                                  color: currentCouple.isStreakFrozen
+                                                      ? const Color(0xFF0277BD)
+                                                      : GarabuTheme.deepEspresso,
+                                                ),
+                                              ),
+                                              if (currentCouple.isStreakFrozen) ...[
+                                                const SizedBox(width: 3),
+                                                const Icon(
+                                                  Icons.touch_app_rounded,
+                                                  color: Color(0xFF0288D1),
+                                                  size: 13,
+                                                ),
+                                              ],
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Icon(
-                                            currentCouple.isStreakFrozen
-                                                ? Icons.ac_unit_rounded
-                                                : Icons.local_fire_department_rounded,
-                                            color: currentCouple.isStreakFrozen
-                                                ? const Color(0xFF0288D1)
-                                                : const Color(0xFFFF7043),
-                                            size: 18,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            '${currentCouple.streak}',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              fontWeight: FontWeight.bold,
-                                              color: currentCouple.isStreakFrozen
-                                                  ? const Color(0xFF0277BD)
-                                                  : GarabuTheme.deepEspresso,
-                                            ),
-                                          ),
-                                          if (currentCouple.isStreakFrozen) ...[
-                                            const SizedBox(width: 4),
-                                            const Icon(
-                                              Icons.touch_app_rounded,
-                                              color: Color(0xFF0288D1),
-                                              size: 14,
-                                            ),
-                                          ],
-                                        ],
-                                      ),
-                                    ),
+                                      const SizedBox(height: 3),
+
+                                      // Dos corazones: Uno para cada persona + puntito verde de presencia en línea
+                                      _buildCoupleStreakHearts(currentCouple),
+                                    ],
                                   ),
                                   const SizedBox(width: 8),
 

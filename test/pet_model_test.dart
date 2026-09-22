@@ -323,5 +323,53 @@ void main() {
       expect(fromMap.activePinturillo?['word'], 'CORAZON');
       expect(fromMap.activePinturillo?['category'], 'Amor');
     });
+
+    test('CoupleModel gestiona interacciones individuales y presencia en linea', () {
+      final now = DateTime.now();
+      final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+      final couple = CoupleModel(
+        id: 'cpl_presence',
+        user1Id: 'u1',
+        user1Name: 'Angel',
+        user2Id: 'u2',
+        user2Name: 'Maria',
+        inviteCode: '999888',
+        streak: 4,
+        lastInteraction: now,
+        status: 'ready',
+        user1LastInteractionDate: todayStr,
+        user2LastInteractionDate: null,
+        user1LastSeen: now.subtract(const Duration(seconds: 30)), // En línea (hace 30s)
+        user2LastSeen: now.subtract(const Duration(minutes: 10)), // Desconectado (hace 10m)
+        createdAt: now,
+      );
+
+      // Verificación de interacción individual de hoy
+      expect(couple.hasUser1InteractedToday(now), true);
+      expect(couple.hasUser2InteractedToday(now), false);
+      expect(couple.hasBothInteractedToday(now), false);
+
+      // Verificación de presencia en línea
+      expect(couple.isUser1Online(now), true);
+      expect(couple.isUser2Online(now), false);
+
+      // Al interactuar u2 hoy
+      final updated = couple.copyWith(
+        user2LastInteractionDate: todayStr,
+        user2LastSeen: now,
+      );
+      expect(updated.hasUser2InteractedToday(now), true);
+      expect(updated.hasBothInteractedToday(now), true);
+      expect(updated.isUser2Online(now), true);
+
+      // Serialización y deserialización
+      final map = updated.toMap();
+      final fromMap = CoupleModel.fromMap(map, 'cpl_presence');
+      expect(fromMap.user1LastInteractionDate, todayStr);
+      expect(fromMap.user2LastInteractionDate, todayStr);
+      expect(fromMap.hasBothInteractedToday(now), true);
+      expect(fromMap.isUser1Online(now), true);
+    });
   });
 }

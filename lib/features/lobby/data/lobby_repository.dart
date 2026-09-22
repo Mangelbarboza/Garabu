@@ -312,6 +312,129 @@ class LobbyRepository {
     }
   }
 
+  /// Actualiza la presencia en tiempo real del usuario (puntito verde)
+  Future<void> updateUserPresence({
+    required String coupleId,
+    required String userId,
+  }) async {
+    final now = DateTime.now();
+    CoupleModel? current;
+    if (_firestore != null) {
+      final doc = await _firestore!.collection('couples').doc(coupleId).get();
+      if (doc.exists && doc.data() != null) {
+        current = CoupleModel.fromMap(doc.data()!, doc.id);
+      }
+    } else {
+      current = _mockCouples[coupleId];
+    }
+    if (current == null) return;
+
+    final isUser1 = userId == current.user1Id;
+    final updates = <String, dynamic>{
+      isUser1 ? 'user1LastSeen' : 'user2LastSeen': now.toIso8601String(),
+    };
+
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set(updates, SetOptions(merge: true));
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final updated = current.copyWith(
+          user1LastSeen: isUser1 ? now : current.user1LastSeen,
+          user2LastSeen: !isUser1 ? now : current.user2LastSeen,
+        );
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
+
+  /// Registra una interacción diaria (cosquillas, comida, minijuegos, luz, etc.) para un usuario
+  Future<void> recordUserInteraction({
+    required String coupleId,
+    required String userId,
+  }) async {
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    CoupleModel? current;
+    if (_firestore != null) {
+      final doc = await _firestore!.collection('couples').doc(coupleId).get();
+      if (doc.exists && doc.data() != null) {
+        current = CoupleModel.fromMap(doc.data()!, doc.id);
+      }
+    } else {
+      current = _mockCouples[coupleId];
+    }
+    if (current == null) return;
+
+    final isUser1 = userId == current.user1Id;
+    final newUser1Date = isUser1 ? todayStr : current.user1LastInteractionDate;
+    final newUser2Date = !isUser1 ? todayStr : current.user2LastInteractionDate;
+
+    final bothDone = (newUser1Date == todayStr) && (newUser2Date == todayStr);
+
+    int newStreak = current.streak;
+    bool isFrozen = current.isStreakFrozen;
+    String? newStreakDate = current.lastStreakDate;
+
+    if (bothDone) {
+      // Si ambos ya interactuaron hoy y la racha de hoy no se había consolidado
+      if (current.lastStreakDate != todayStr) {
+        if (current.lastStreakDate == null) {
+          newStreak = max(current.streak, 1);
+          isFrozen = false;
+        } else {
+          try {
+            final lastParts = current.lastStreakDate!.split('-').map(int.parse).toList();
+            final lastDate = DateTime(lastParts[0], lastParts[1], lastParts[2]);
+            final todayMidnight = DateTime(now.year, now.month, now.day);
+            final diffDays = todayMidnight.difference(lastDate).inDays;
+
+            if (diffDays == 1) {
+              newStreak += 1;
+              isFrozen = false;
+            } else if (diffDays > 1) {
+              isFrozen = false;
+            }
+          } catch (_) {
+            isFrozen = false;
+          }
+        }
+        newStreakDate = todayStr;
+      } else {
+        isFrozen = false;
+      }
+    }
+
+    final updates = <String, dynamic>{
+      isUser1 ? 'user1LastInteractionDate' : 'user2LastInteractionDate': todayStr,
+      isUser1 ? 'user1LastSeen' : 'user2LastSeen': now.toIso8601String(),
+      'lastInteraction': now.toIso8601String(),
+      'streak': newStreak,
+      'lastStreakDate': newStreakDate,
+      'isStreakFrozen': isFrozen,
+    };
+
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set(updates, SetOptions(merge: true));
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final updated = current.copyWith(
+          user1LastInteractionDate: newUser1Date,
+          user2LastInteractionDate: newUser2Date,
+          user1LastSeen: isUser1 ? now : current.user1LastSeen,
+          user2LastSeen: !isUser1 ? now : current.user2LastSeen,
+          lastInteraction: now,
+          streak: newStreak,
+          lastStreakDate: newStreakDate,
+          isStreakFrozen: isFrozen,
+        );
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
+
   /// Obtiene el modelo de la pareja por su ID
   Future<CoupleModel?> getCouple(String coupleId) async {
     if (_firestore != null) {
@@ -332,6 +455,9 @@ class LobbyRepository {
     required String userId,
     required int score,
   }) async {
+    // Cualquier partida jugada cuenta como interacción diaria
+    await recordUserInteraction(coupleId: coupleId, userId: userId);
+
     final current = await getCouple(coupleId);
     if (current == null) return;
 
