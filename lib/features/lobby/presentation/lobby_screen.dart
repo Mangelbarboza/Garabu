@@ -7,6 +7,7 @@ import '../../canvas/presentation/clothes_canvas_screen.dart';
 import '../../canvas/presentation/pet_naming_dialog.dart';
 import '../data/lobby_repository.dart';
 import '../domain/couple_model.dart';
+import '../../settings/presentation/settings_bottom_sheet.dart';
 
 class LobbyScreen extends ConsumerStatefulWidget {
   const LobbyScreen({super.key});
@@ -139,9 +140,12 @@ class _LobbyScreenState extends ConsumerState<LobbyScreen> {
         title: const Text('Comenzar en Pareja'),
         actions: [
           IconButton(
-            tooltip: 'Cerrar sesión',
-            icon: const Icon(Icons.logout_rounded, color: GarabuTheme.primaryBrown),
-            onPressed: () => ref.read(authRepositoryProvider).signOut(),
+            tooltip: 'Ajustes',
+            icon: const Icon(Icons.settings_rounded, color: GarabuTheme.primaryBrown),
+            onPressed: () => SettingsBottomSheet.show(
+              context: context,
+              couple: _createdCouple,
+            ),
           ),
         ],
       ),

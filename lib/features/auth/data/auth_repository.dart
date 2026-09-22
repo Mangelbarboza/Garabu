@@ -242,4 +242,24 @@ class AuthRepository {
     _currentMockUser = null;
     _controller.add(null);
   }
+
+  Future<void> deleteAccount() async {
+    final currentUid = _auth?.currentUser?.uid ?? _currentMockUser?.id;
+    if (_auth != null && _auth!.currentUser != null) {
+      if (_firestore != null && currentUid != null) {
+        try {
+          await _firestore!.collection('users').doc(currentUid).delete();
+        } catch (e) {
+          debugPrint('Error eliminando doc de usuario en Firestore: $e');
+        }
+      }
+      try {
+        await _auth!.currentUser!.delete();
+      } catch (e) {
+        debugPrint('Error eliminando usuario de FirebaseAuth: $e');
+      }
+    }
+    _currentMockUser = null;
+    _controller.add(null);
+  }
 }

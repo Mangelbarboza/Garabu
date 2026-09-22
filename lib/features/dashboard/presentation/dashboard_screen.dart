@@ -22,6 +22,7 @@ import 'widgets/language_bottom_sheet.dart';
 import 'widgets/mailbox_bottom_sheet.dart';
 import 'widgets/pet_vital_bars.dart';
 import 'widgets/shop_bottom_sheet.dart';
+import '../../settings/presentation/settings_bottom_sheet.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   final CoupleModel couple;
@@ -989,11 +990,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                     },
                                   ),
 
-                                  // Botón de Salir
+                                  // Botón de Ajustes (Audio, Custodia, Cuenta)
                                   IconButton(
-                                    tooltip: 'Cerrar sesión',
-                                    icon: const Icon(Icons.logout_rounded, color: GarabuTheme.textSecondary, size: 20),
-                                    onPressed: () => ref.read(authRepositoryProvider).signOut(),
+                                    tooltip: 'Ajustes',
+                                    icon: const Icon(Icons.settings_rounded, color: GarabuTheme.primaryBrown, size: 22),
+                                    onPressed: () => SettingsBottomSheet.show(
+                                      context: context,
+                                      couple: currentCouple,
+                                      pet: pet,
+                                    ),
                                   ),
                                 ],
                               ),
