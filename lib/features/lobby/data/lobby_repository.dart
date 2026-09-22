@@ -223,4 +223,92 @@ class LobbyRepository {
       }
     }
   }
+
+  /// Comprueba y actualiza la racha diaria por fecha calendario
+  Future<void> verifyAndUpdateDailyStreak(String coupleId) async {
+    CoupleModel? current;
+    if (_firestore != null) {
+      final doc = await _firestore!.collection('couples').doc(coupleId).get();
+      if (doc.exists && doc.data() != null) {
+        current = CoupleModel.fromMap(doc.data()!, doc.id);
+      }
+    } else {
+      current = _mockCouples[coupleId];
+    }
+    if (current == null) return;
+
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    if (current.lastStreakDate == todayStr) return;
+
+    int newStreak = current.streak;
+    bool isFrozen = current.isStreakFrozen;
+
+    if (current.lastStreakDate == null) {
+      newStreak = max(current.streak, 1);
+      isFrozen = false;
+    } else {
+      try {
+        final lastDateParts = current.lastStreakDate!.split('-').map(int.parse).toList();
+        final lastDate = DateTime(lastDateParts[0], lastDateParts[1], lastDateParts[2]);
+        final todayMidnight = DateTime(now.year, now.month, now.day);
+        final diffDays = todayMidnight.difference(lastDate).inDays;
+
+        if (diffDays == 1) {
+          newStreak += 1;
+          isFrozen = false;
+        } else if (diffDays > 1) {
+          isFrozen = true;
+        }
+      } catch (_) {}
+    }
+
+    final updates = <String, dynamic>{
+      'streak': newStreak,
+      'lastStreakDate': todayStr,
+      'isStreakFrozen': isFrozen,
+      'lastInteraction': now.toIso8601String(),
+    };
+
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set(updates, SetOptions(merge: true));
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final updated = current.copyWith(
+          streak: newStreak,
+          lastStreakDate: todayStr,
+          isStreakFrozen: isFrozen,
+          lastInteraction: now,
+        );
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
+
+  /// Restablece gratis una racha congelada
+  Future<void> restoreFrozenStreak(String coupleId) async {
+    final now = DateTime.now();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set({
+        'isStreakFrozen': false,
+        'lastStreakDate': todayStr,
+        'lastInteraction': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final current = _mockCouples[coupleId]!;
+        final updated = current.copyWith(
+          isStreakFrozen: false,
+          lastStreakDate: todayStr,
+          lastInteraction: now,
+        );
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
 }

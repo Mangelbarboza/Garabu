@@ -244,18 +244,27 @@ class PetModel {
     return (1.0 - (diffHours / 6.0)).clamp(0.05, 1.0);
   }
 
-  /// La energía aguanta mucho más (24h) y sube notablemente al mandar a dormir
+  /// La energía aguanta 1 día entero (~4.75% por hora despierto, ~5% a las 20h)
+  /// y se recarga durante la noche (~7.5h de sueño para el 100%)
   double get energy {
     if (isSleeping) {
-      if (sleepStartedAt == null) return 0.95;
-      final sleptMinutes = DateTime.now().difference(sleepStartedAt!).inMinutes;
-      final recovery = (sleptMinutes / 45.0).clamp(0.0, 1.0);
-      return (0.4 + (recovery * 0.6)).clamp(0.4, 1.0);
+      final sleepTime = sleepStartedAt ?? createdAt;
+      final sleptHours = DateTime.now().difference(sleepTime).inMinutes / 60.0;
+      final recovery = (sleptHours / 7.5).clamp(0.0, 1.0);
+      return (0.05 + (recovery * 0.95)).clamp(0.05, 1.0);
     } else {
-      if (lastSleptAt == null) return 0.90;
-      final awakeHours = DateTime.now().difference(lastSleptAt!).inMinutes / 60.0;
-      return (1.0 - (awakeHours / 24.0)).clamp(0.10, 1.0);
+      final wakeTime = lastSleptAt ?? createdAt;
+      final awakeHours = DateTime.now().difference(wakeTime).inMinutes / 60.0;
+      return (1.0 - (awakeHours * 0.0475)).clamp(0.04, 1.0);
     }
+  }
+
+  /// El personaje enferma si pasa la noche entera despierto (>19.5h continuas y energía crítica)
+  bool get isSick {
+    if (isSleeping) return false;
+    final wakeTime = lastSleptAt ?? createdAt;
+    final awakeHours = DateTime.now().difference(wakeTime).inMinutes / 60.0;
+    return awakeHours >= 19.5 && energy <= 0.10;
   }
 
   double get happiness {

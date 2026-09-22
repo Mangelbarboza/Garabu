@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/garabu_theme.dart';
 import '../../../../core/widgets/garabu_image.dart';
+import '../../../canvas/domain/clothing_catalog.dart';
 import '../../../canvas/presentation/fruit_canvas_screen.dart';
 import '../../../pet/data/pet_repository.dart';
 import '../../../pet/domain/pet_model.dart';
@@ -86,12 +87,24 @@ class ShopBottomSheet extends ConsumerStatefulWidget {
 
 class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
   int _selectedTab = 0; // 0 = Comida, 1 = Ropa, 2 = Fondos
+  ClothingCategory _selectedClothingCat = ClothingCategory.bows;
   String? _animatingItemKey;
 
   Future<void> _onBuyItem(String key, int price) async {
     setState(() => _animatingItemKey = key);
     final petRepo = ref.read(petRepositoryProvider);
     await petRepo.buyFruit(petId: widget.pet.id, fruitKey: key, quantity: 1, price: price);
+    Future.delayed(const Duration(milliseconds: 280), () {
+      if (mounted) setState(() => _animatingItemKey = null);
+    });
+  }
+
+  Future<void> _onBuyClothing(CatalogItem item, PetModel pet) async {
+    if (pet.coins < item.price) return;
+    setState(() => _animatingItemKey = item.id);
+    final garment = await item.toGarmentItem();
+    final petRepo = ref.read(petRepositoryProvider);
+    await petRepo.buyGarment(petId: pet.id, garment: garment, price: item.price);
     Future.delayed(const Duration(milliseconds: 280), () {
       if (mounted) setState(() => _animatingItemKey = null);
     });
@@ -543,37 +556,159 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
               ),
             ),
           ] else if (_selectedTab == 1) ...[
-            // Pestaña Ropa (Prendas y Accesorios en confección)
+            // Pestaña Ropa (25 Accesorios en 5 categorías: Lazos, Lentes, Gorras, Sombreros, Zapatos)
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+              child: Row(
+                children: [
+                  _buildCategoryPill('🎀 Lazos', ClothingCategory.bows),
+                  const SizedBox(width: 8),
+                  _buildCategoryPill('👓 Lentes', ClothingCategory.glasses),
+                  const SizedBox(width: 8),
+                  _buildCategoryPill('🧢 Gorras', ClothingCategory.caps),
+                  const SizedBox(width: 8),
+                  _buildCategoryPill('🎩 Sombreros', ClothingCategory.hats),
+                  const SizedBox(width: 8),
+                  _buildCategoryPill('👟 Zapatos', ClothingCategory.shoes),
+                ],
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            // Cuadrícula de 5 artículos de la categoría activa
             Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.checkroom_rounded,
-                      size: 48,
-                      color: GarabuTheme.primaryBrown.withValues(alpha: 0.4),
+              child: Builder(
+                builder: (context) {
+                  final filteredItems = kClothingCatalog
+                      .where((item) => item.category == _selectedClothingCat)
+                      .toList();
+
+                  return GridView.builder(
+                    itemCount: filteredItems.length,
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 10,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.72,
                     ),
-                    const SizedBox(height: 12),
-                    const Text(
-                      'Taller de Ropa',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: GarabuTheme.deepEspresso,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 32.0),
-                      child: Text(
-                        'Crea prendas únicas dibujándolas sobre tu mascota en el Clóset. ¡Próximamente nuevos accesorios para comprar!',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12.5, color: GarabuTheme.textSecondary),
-                      ),
-                    ),
-                  ],
-                ),
+                    itemBuilder: (context, index) {
+                      final item = filteredItems[index];
+                      final isOwned = pet.closet.any((g) => g.id == item.id);
+                      final isAnimating = _animatingItemKey == item.id;
+
+                      return AnimatedScale(
+                        scale: isAnimating ? 1.08 : 1.0,
+                        duration: const Duration(milliseconds: 180),
+                        curve: Curves.easeOutBack,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: GarabuTheme.paperWhite,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: isAnimating
+                                  ? GarabuTheme.primaryBrown
+                                  : GarabuTheme.warmSand.withValues(alpha: 0.7),
+                              width: isAnimating ? 2.0 : 1.2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.03),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                          padding: const EdgeInsets.all(6),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // Vista previa dibujada con canvas
+                              Container(
+                                width: 56,
+                                height: 56,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: GarabuTheme.warmSand.withValues(alpha: 0.4)),
+                                ),
+                                child: Center(
+                                  child: _AccessoryCanvasPreview(
+                                    painter: item.painter,
+                                    size: 50,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+
+                              // Nombre del accesorio
+                              Text(
+                                item.name,
+                                textAlign: TextAlign.center,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: GarabuTheme.deepEspresso,
+                                  height: 1.1,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+
+                              // Botón de Comprar o 'En Clóset'
+                              if (isOwned)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFE8F5E9),
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: const Color(0xFF81C784), width: 0.8),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.check_circle_rounded, size: 10, color: Color(0xFF2E7D32)),
+                                      SizedBox(width: 3),
+                                      Text(
+                                        'En Clóset',
+                                        style: TextStyle(
+                                          fontSize: 9.5,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFF2E7D32),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                InkWell(
+                                  onTap: () => _onBuyClothing(item, pet),
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFF8E1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
+                                    ),
+                                    child: Text(
+                                      '🪙 ${item.price}',
+                                      style: const TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFE65100),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ] else ...[
@@ -674,4 +809,69 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
       ),
     );
   }
+
+  Widget _buildCategoryPill(String title, ClothingCategory category) {
+    final isSelected = _selectedClothingCat == category;
+    return InkWell(
+      onTap: () => setState(() => _selectedClothingCat = category),
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.paperWhite,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected ? GarabuTheme.primaryBrown : GarabuTheme.warmSand.withValues(alpha: 0.8),
+          ),
+        ),
+        child: Text(
+          title,
+          style: TextStyle(
+            fontSize: 11,
+            fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+            color: isSelected ? Colors.white : GarabuTheme.deepEspresso,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AccessoryCanvasPreview extends StatelessWidget {
+  final void Function(Canvas canvas, Size size) painter;
+  final double size;
+
+  const _AccessoryCanvasPreview({
+    required this.painter,
+    this.size = 50.0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: size,
+      height: size,
+      child: CustomPaint(
+        painter: _AccessoryCustomPainter(painter),
+      ),
+    );
+  }
+}
+
+class _AccessoryCustomPainter extends CustomPainter {
+  final void Function(Canvas canvas, Size size) painterFn;
+
+  _AccessoryCustomPainter(this.painterFn);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    final scale = size.width / 300.0;
+    canvas.scale(scale, scale);
+    painterFn(canvas, const Size(300, 300));
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }

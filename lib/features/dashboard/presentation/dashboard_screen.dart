@@ -135,6 +135,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       duration: const Duration(milliseconds: 130),
     );
     _scheduleSimultaneousBlink();
+
+    // 5. Verificar y actualizar racha diaria del calendario
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(lobbyRepositoryProvider).verifyAndUpdateDailyStreak(widget.couple.id);
+      }
+    });
   }
 
   void _scheduleSimultaneousBlink() {
@@ -388,6 +395,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   PetEmotion _resolvePetEmotion(PetModel pet) {
     if (pet.isSleeping) return PetEmotion.sleeping;
     if (_isChewing || _isFeedingMouthHovered) return PetEmotion.eating;
+    if (pet.isSick) return PetEmotion.sad;
     if (_isPetHappy) return PetEmotion.happy;
     if (pet.hunger < 0.15) return PetEmotion.hungry;
     if (pet.thirst < 0.15) return PetEmotion.thirsty;
@@ -461,6 +469,97 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       }
     }
     return widgets;
+  }
+
+  void _showRestoreStreakDialog(BuildContext context, CoupleModel couple) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        title: const Row(
+          children: [
+            Icon(Icons.ac_unit_rounded, color: Color(0xFF0288D1), size: 28),
+            SizedBox(width: 8),
+            Text(
+              '¡Racha Congelada!',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+                color: GarabuTheme.deepEspresso,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Parece que se les pasó un día, ¡pero no te preocupes! En Garabu apoyamos el amor constante. '
+              'Puedes descongelar y recuperar tu racha de ${couple.streak} días totalmente GRATIS.',
+              style: const TextStyle(
+                fontSize: 14,
+                color: GarabuTheme.deepEspresso,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFE1F5FE),
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: const Color(0xFF81D4FA)),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.favorite_rounded, color: Color(0xFFE91E63), size: 20),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Racha guardada: ${couple.streak} días 🔥',
+                      style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF01579B),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('Después', style: TextStyle(color: GarabuTheme.primaryBrown)),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final messenger = ScaffoldMessenger.of(context);
+              Navigator.of(ctx).pop();
+              await ref.read(lobbyRepositoryProvider).restoreFrozenStreak(couple.id);
+              if (mounted) {
+                messenger.showSnackBar(
+                  const SnackBar(
+                    content: Text('¡Racha descongelada con éxito! A seguir cuidando de Garabu 🔥'),
+                    backgroundColor: Color(0xFFFF7043),
+                  ),
+                );
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFFF7043),
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('Restablecer Gratis ✨', style: TextStyle(fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -759,32 +858,58 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                               // 1. Barra Superior Nativa (Racha, Nombre de mascota, Lenguaje, Modo Noche, Editar Cuerpo, Salir)
                               Row(
                                 children: [
-                                  // Racha con fueguito limpio y número
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(16),
-                                      border: Border.all(color: GarabuTheme.warmSand),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        const Icon(
-                                          Icons.local_fire_department_rounded,
-                                          color: Color(0xFFFF7043),
-                                          size: 18,
+                                  // Racha con fueguito limpio y número o hielo si está congelada
+                                  GestureDetector(
+                                    onTap: currentCouple.isStreakFrozen
+                                        ? () => _showRestoreStreakDialog(context, currentCouple)
+                                        : null,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                                      decoration: BoxDecoration(
+                                        color: currentCouple.isStreakFrozen
+                                            ? const Color(0xFFE1F5FE)
+                                            : Colors.white,
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: currentCouple.isStreakFrozen
+                                              ? const Color(0xFF0288D1)
+                                              : GarabuTheme.warmSand,
+                                          width: currentCouple.isStreakFrozen ? 1.6 : 1.0,
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${currentCouple.streak}',
-                                          style: const TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.bold,
-                                            color: GarabuTheme.deepEspresso,
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Icon(
+                                            currentCouple.isStreakFrozen
+                                                ? Icons.ac_unit_rounded
+                                                : Icons.local_fire_department_rounded,
+                                            color: currentCouple.isStreakFrozen
+                                                ? const Color(0xFF0288D1)
+                                                : const Color(0xFFFF7043),
+                                            size: 18,
                                           ),
-                                        ),
-                                      ],
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${currentCouple.streak}',
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              fontWeight: FontWeight.bold,
+                                              color: currentCouple.isStreakFrozen
+                                                  ? const Color(0xFF0277BD)
+                                                  : GarabuTheme.deepEspresso,
+                                            ),
+                                          ),
+                                          if (currentCouple.isStreakFrozen) ...[
+                                            const SizedBox(width: 4),
+                                            const Icon(
+                                              Icons.touch_app_rounded,
+                                              color: Color(0xFF0288D1),
+                                              size: 14,
+                                            ),
+                                          ],
+                                        ],
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -191,6 +192,41 @@ class PetRepository {
           closet: closet,
           activeGarmentId: garmentId,
           clothesImageUrl: imageUrl,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Clóset: Comprar y añadir prenda o accesorio al clóset
+  Future<void> buyGarment({
+    required String petId,
+    required GarmentItem garment,
+    required int price,
+  }) async {
+    final current = await getPet(petId);
+    if (current == null) return;
+    final now = DateTime.now();
+
+    final closet = List<GarmentItem>.from(current.closet);
+    if (closet.any((g) => g.id == garment.id)) return;
+
+    final newCoins = max(0, current.coins - price);
+    closet.add(garment);
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'closet': closet.map((g) => g.toMap()).toList(),
+        'coins': newCoins,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          closet: closet,
+          coins: newCoins,
           updatedAt: now,
         );
         _mockPets[petId] = updated;

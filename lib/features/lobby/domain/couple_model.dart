@@ -6,6 +6,8 @@ class CoupleModel {
   final String? user2Name;
   final String inviteCode;
   final int streak;
+  final String? lastStreakDate;
+  final bool isStreakFrozen;
   final DateTime lastInteraction;
   final String? petId;
   final String? user1PetId;
@@ -22,6 +24,8 @@ class CoupleModel {
     this.user2Name,
     required this.inviteCode,
     this.streak = 1,
+    this.lastStreakDate,
+    this.isStreakFrozen = false,
     required this.lastInteraction,
     this.petId,
     this.user1PetId,
@@ -43,6 +47,8 @@ class CoupleModel {
       'user2Name': user2Name,
       'inviteCode': inviteCode,
       'streak': streak,
+      'lastStreakDate': lastStreakDate,
+      'isStreakFrozen': isStreakFrozen,
       'lastInteraction': lastInteraction.toIso8601String(),
       'petId': petId ?? user1PetId,
       'user1PetId': user1PetId ?? petId,
@@ -67,6 +73,8 @@ class CoupleModel {
       user2Name: map['user2Name'],
       inviteCode: map['inviteCode'] ?? '',
       streak: (map['streak'] as num?)?.toInt() ?? 1,
+      lastStreakDate: map['lastStreakDate'] as String?,
+      isStreakFrozen: map['isStreakFrozen'] as bool? ?? false,
       lastInteraction: map['lastInteraction'] != null
           ? DateTime.tryParse(map['lastInteraction']) ?? DateTime.now()
           : DateTime.now(),
@@ -89,6 +97,8 @@ class CoupleModel {
     String? user2Name,
     String? inviteCode,
     int? streak,
+    String? lastStreakDate,
+    bool? isStreakFrozen,
     DateTime? lastInteraction,
     String? petId,
     String? user1PetId,
@@ -105,6 +115,8 @@ class CoupleModel {
       user2Name: user2Name ?? this.user2Name,
       inviteCode: inviteCode ?? this.inviteCode,
       streak: streak ?? this.streak,
+      lastStreakDate: lastStreakDate ?? this.lastStreakDate,
+      isStreakFrozen: isStreakFrozen ?? this.isStreakFrozen,
       lastInteraction: lastInteraction ?? this.lastInteraction,
       petId: petId ?? this.petId,
       user1PetId: user1PetId ?? this.user1PetId,

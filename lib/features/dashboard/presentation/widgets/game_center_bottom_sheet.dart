@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/garabu_theme.dart';
 import '../../../minigames/atrapa_garabutos_screen.dart';
+import '../../../minigames/batalla_cosquillas_screen.dart';
 import '../../../pet/domain/pet_model.dart';
 
 class GameCenterBottomSheet extends StatelessWidget {
@@ -33,193 +34,297 @@ class GameCenterBottomSheet extends StatelessWidget {
         top: 16,
         bottom: MediaQuery.of(context).viewInsets.bottom + 28,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Barra de agarre
-          Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: GarabuTheme.warmSand,
-              borderRadius: BorderRadius.circular(2),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Barra de agarre
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: GarabuTheme.warmSand,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
 
-          // Ícono de control de videojuegos
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: GarabuTheme.primaryBrown.withValues(alpha: 0.1),
-                      shape: BoxShape.circle,
+            // Ícono de control de videojuegos
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: GarabuTheme.primaryBrown.withValues(alpha: 0.1),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.sports_esports_rounded,
+                        size: 26,
+                        color: GarabuTheme.primaryBrown,
+                      ),
                     ),
-                    child: const Icon(
-                      Icons.sports_esports_rounded,
-                      size: 26,
-                      color: GarabuTheme.primaryBrown,
+                    const SizedBox(width: 10),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Sala de Juegos',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: GarabuTheme.deepEspresso,
+                          ),
+                        ),
+                        Text(
+                          '¡Gana Monedas Garabu y diviértete!',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: GarabuTheme.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
+                  ],
+                ),
+                IconButton(
+                  icon: const Icon(Icons.close_rounded, color: GarabuTheme.textSecondary),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // Tarjeta 1: Atrapa Garabutos
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: GarabuTheme.paperWhite,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: GarabuTheme.primaryBrown,
+                  width: 1.8,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
                   ),
-                  const SizedBox(width: 10),
-                  const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
                     children: [
-                      Text(
-                        'Sala de Juegos',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: GarabuTheme.deepEspresso,
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8F5E9),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'MINIJUEGO 1',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
                         ),
                       ),
-                      Text(
-                        '¡Gana Monedas Garabu y diviértete!',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: GarabuTheme.textSecondary,
+                      const Spacer(),
+                      const Icon(Icons.monetization_on_rounded, color: Color(0xFFFFA000), size: 16),
+                      const SizedBox(width: 4),
+                      const Text('Monedas & Reflejos', style: TextStyle(fontSize: 11, color: GarabuTheme.textSecondary)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8E1),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFFFD54F)),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.star_rounded, color: Color(0xFFFFA000), size: 28),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Atrapa Garabutos',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              '¡Esquiva bombas, atrapa frutas, estrellas y relojes para sumar tiempo y puntos!',
+                              style: TextStyle(fontSize: 12, color: GarabuTheme.textSecondary),
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => AtrapaGarabutosScreen(pet: pet),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: const Text('Jugar Atrapa Garabutos', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: GarabuTheme.primaryBrown,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              IconButton(
-                icon: const Icon(Icons.close_rounded, color: GarabuTheme.textSecondary),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          // Tarjeta del juego activo: Atrapa Garabutos
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: GarabuTheme.paperWhite,
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(
-                color: GarabuTheme.primaryBrown,
-                width: 1.8,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.04),
-                  blurRadius: 8,
-                  offset: const Offset(0, 3),
-                ),
-              ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFE8F5E9),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Text(
-                        '¡NUEVO Y DISPONIBLE!',
-                        style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
-                      ),
-                    ),
-                    const Spacer(),
-                    const Icon(Icons.monetization_on_rounded, color: Color(0xFFFFA000), size: 16),
-                    const SizedBox(width: 4),
-                    const Text('Recompensa: Monedas', style: TextStyle(fontSize: 11, color: GarabuTheme.textSecondary)),
-                  ],
+            const SizedBox(height: 14),
+
+            // Tarjeta 2: Batalla de Cosquillas
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: GarabuTheme.paperWhite,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: const Color(0xFFE91E63),
+                  width: 1.8,
                 ),
-                const SizedBox(height: 10),
-                Row(
-                  children: [
-                    Container(
-                      width: 48,
-                      height: 48,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFFFF8E1),
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: const Color(0xFFFFD54F)),
-                      ),
-                      child: const Center(
-                        child: Icon(Icons.star_rounded, color: Color(0xFFFFA000), size: 28),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Atrapa Garabutos',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
-                          ),
-                          SizedBox(height: 2),
-                          Text(
-                            'Mueve la canasta de tu mascota para atrapar todas las frutas y estrellas que caen.',
-                            style: TextStyle(fontSize: 12, color: GarabuTheme.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.of(context).pop();
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => AtrapaGarabutosScreen(pet: pet),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.04),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFCE4EC),
+                          borderRadius: BorderRadius.circular(10),
                         ),
-                      );
-                    },
-                    icon: const Icon(Icons.play_arrow_rounded, size: 20),
-                    label: const Text('Jugar Ahora', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: GarabuTheme.primaryBrown,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                        child: const Text(
+                          '¡NUEVO MINIJUEGO 2!',
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Color(0xFFC2185B)),
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(Icons.favorite_rounded, color: Color(0xFFE91E63), size: 16),
+                      const SizedBox(width: 4),
+                      const Text('+Felicidad y Monedas', style: TextStyle(fontSize: 11, color: GarabuTheme.textSecondary)),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFCE4EC),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(color: const Color(0xFFF48FB1)),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.mood_rounded, color: Color(0xFFE91E63), size: 28),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Batalla de Cosquillas',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
+                            ),
+                            SizedBox(height: 2),
+                            Text(
+                              '¡Rasquea rápido las garabu-pulguitas y activa la Fiebre de Carcajadas x2!',
+                              style: TextStyle(fontSize: 12, color: GarabuTheme.textSecondary),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => BatallaCosquillasScreen(pet: pet),
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.play_arrow_rounded, size: 20),
+                      label: const Text('Jugar Batalla de Cosquillas', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFFE91E63),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
                     ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
+            const SizedBox(height: 14),
 
-          // Próximamente
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-            decoration: BoxDecoration(
-              color: GarabuTheme.paperWhite.withValues(alpha: 0.6),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: GarabuTheme.warmSand.withValues(alpha: 0.5)),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.hourglass_top_rounded, size: 18, color: GarabuTheme.textSecondary),
-                SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Próximamente: "Dibuja y Adivina en Pareja" y "Batalla de Cosquillas"',
-                    style: TextStyle(fontSize: 11.5, color: GarabuTheme.textSecondary),
+            // Próximamente
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: GarabuTheme.paperWhite.withValues(alpha: 0.6),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: GarabuTheme.warmSand.withValues(alpha: 0.5)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.hourglass_top_rounded, size: 18, color: GarabuTheme.textSecondary),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Próximamente: "Dibuja y Adivina en Pareja"',
+                      style: TextStyle(fontSize: 11.5, color: GarabuTheme.textSecondary),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
