@@ -264,7 +264,7 @@ class PetRepository {
     }
   }
 
-  /// Clóset: Alternar equipamiento de prenda (hasta 2 prendas simultáneas)
+  /// Clóset: Alternar equipamiento de prenda (hasta 5 prendas simultáneas)
   Future<void> toggleEquipGarment({
     required String petId,
     required String garmentId,
@@ -277,13 +277,53 @@ class PetRepository {
     if (equipped.contains(garmentId)) {
       equipped.remove(garmentId);
     } else {
-      if (equipped.length < 2) {
+      if (equipped.length < 5) {
         equipped.add(garmentId);
       } else {
-        equipped = [equipped[1], garmentId];
+        equipped = [...equipped.sublist(1), garmentId];
       }
     }
 
+    String? primaryImageUrl;
+    if (equipped.isNotEmpty) {
+      final found = current.closet.firstWhere(
+        (g) => g.id == equipped.first,
+        orElse: () => GarmentItem(id: '', name: '', imageUrl: '', createdAt: now),
+      );
+      if (found.imageUrl.isNotEmpty) primaryImageUrl = found.imageUrl;
+    }
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'equippedGarmentIds': equipped,
+        'activeGarmentId': equipped.isNotEmpty ? equipped.last : null,
+        'clothesImageUrl': primaryImageUrl,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          equippedGarmentIds: equipped,
+          activeGarmentId: equipped.isNotEmpty ? equipped.last : null,
+          clothesImageUrl: primaryImageUrl,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Clóset: Actualizar lista de prendas equipadas (hasta 5 prendas)
+  Future<void> updateEquippedGarments({
+    required String petId,
+    required List<String> garmentIds,
+  }) async {
+    final current = await getPet(petId);
+    if (current == null) return;
+    final now = DateTime.now();
+
+    final equipped = garmentIds.take(5).toList();
     String? primaryImageUrl;
     if (equipped.isNotEmpty) {
       final found = current.closet.firstWhere(
@@ -780,6 +820,42 @@ class PetRepository {
           isSleeping: isSleeping,
           sleepStartedAt: isSleeping ? now : _mockPets[petId]?.sleepStartedAt,
           lastSleptAt: !isSleeping ? now : _mockPets[petId]?.lastSleptAt,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Experiencia & Nivel de la mascota
+  Future<void> addExperience({
+    required String petId,
+    required int expDelta,
+  }) async {
+    final current = await getPet(petId);
+    if (current == null) return;
+
+    int newLevel = current.level;
+    int newExp = current.experience + expDelta;
+
+    while (newExp >= (newLevel * 100)) {
+      newExp -= (newLevel * 100);
+      newLevel += 1;
+    }
+
+    final now = DateTime.now();
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'level': newLevel,
+        'experience': newExp,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          level: newLevel,
+          experience: newExp,
           updatedAt: now,
         );
         _mockPets[petId] = updated;

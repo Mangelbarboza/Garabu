@@ -84,7 +84,7 @@ class _EyePainter extends CustomPainter {
     );
 
     final isLooking = lookDirection != Offset.zero;
-    final isCheer = (isHappy || emotion == PetEmotion.happy) && !isLooking;
+    final isCheer = isHappy && !isLooking;
     final isAsleep = emotion == PetEmotion.sleeping;
 
     // Si está achinado de felicidad (^_^) o totalmente cerrado por sueño o parpadeo

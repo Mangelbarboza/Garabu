@@ -273,15 +273,17 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     });
   }
 
-  void _checkMouthHover(Offset globalPos) {
+  void _checkMouthHover(Offset globalPos, PetModel pet) {
     final renderBox = _petContainerKey.currentContext?.findRenderObject() as RenderBox?;
     if (renderBox != null) {
       final localPos = renderBox.globalToLocal(globalPos);
       final size = renderBox.size;
-      final isHovering = localPos.dx >= -10 &&
-          localPos.dx <= size.width + 10 &&
-          localPos.dy >= -10 &&
-          localPos.dy <= size.height + 10;
+      final mouthPos = Offset(
+        pet.eyesConfig.resolvedMouth.x * size.width,
+        pet.eyesConfig.resolvedMouth.y * size.height,
+      );
+      final distance = (localPos - mouthPos).distance;
+      final isHovering = distance < 70.0;
       if (isHovering != _isFeedingMouthHovered) {
         setState(() {
           _isFeedingMouthHovered = isHovering;
@@ -400,7 +402,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     if (pet.hunger < 0.15) return PetEmotion.hungry;
     if (pet.thirst < 0.15) return PetEmotion.thirsty;
     if (pet.happiness < 0.15 || pet.energy < 0.15) return PetEmotion.sad;
-    return PetEmotion.happy;
+    return PetEmotion.neutral;
   }
 
   Offset _calculateLookDirection(Size canvasSize) {
@@ -425,7 +427,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       top: mouthY - 8,
       child: MouthWidget(
         size: 32,
-        isOpen: _heldFruit != null || _isFeedingMouthHovered || _isChewing,
+        isOpen: _isFeedingMouthHovered || _isChewing,
         isChewing: _isChewing,
         emotion: emotion,
       ),
@@ -826,7 +828,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                   onHover: (event) {
                     if (_heldFruit != null) {
                       setState(() => _pointerPosition = event.position);
-                      _checkMouthHover(event.position);
+                      _checkMouthHover(event.position, pet);
                     }
                   },
                   child: Listener(
@@ -834,13 +836,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                     onPointerDown: (event) {
                       if (_heldFruit != null) {
                         setState(() => _pointerPosition = event.position);
-                        _checkMouthHover(event.position);
+                        _checkMouthHover(event.position, pet);
                       }
                     },
                     onPointerMove: (event) {
                       if (_heldFruit != null) {
                         setState(() => _pointerPosition = event.position);
-                        _checkMouthHover(event.position);
+                        _checkMouthHover(event.position, pet);
                       }
                     },
                     onPointerUp: (event) {
@@ -1104,7 +1106,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                     _buildDockButton(
                                       icon: Icons.sports_esports_rounded,
                                       label: 'Juegos',
-                                      onTap: () => GameCenterBottomSheet.show(context, pet),
+                                      onTap: () => GameCenterBottomSheet.show(context, pet, currentCouple),
                                     ),
                                   ],
                                 ),

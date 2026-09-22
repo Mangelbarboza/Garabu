@@ -311,4 +311,52 @@ class LobbyRepository {
       }
     }
   }
+
+  /// Obtiene el modelo de la pareja por su ID
+  Future<CoupleModel?> getCouple(String coupleId) async {
+    if (_firestore != null) {
+      final doc = await _firestore!.collection('couples').doc(coupleId).get();
+      if (doc.exists && doc.data() != null) {
+        return CoupleModel.fromMap(doc.data()!, doc.id);
+      }
+      return null;
+    } else {
+      return _mockCouples[coupleId];
+    }
+  }
+
+  /// Guarda el récord de un juego para un usuario específico de la pareja
+  Future<void> recordGameScore({
+    required String coupleId,
+    required String gameKey,
+    required String userId,
+    required int score,
+  }) async {
+    final current = await getCouple(coupleId);
+    if (current == null) return;
+
+    final recordKey = '${gameKey}_$userId';
+    final existingScore = current.gameRecords[recordKey] ?? 0;
+    if (score <= existingScore) return;
+
+    final newRecords = Map<String, int>.from(current.gameRecords);
+    newRecords[recordKey] = score;
+
+    final now = DateTime.now();
+    if (_firestore != null) {
+      await _firestore!.collection('couples').doc(coupleId).set({
+        'gameRecords': newRecords,
+        'lastInteraction': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockCouples.containsKey(coupleId)) {
+        final updated = current.copyWith(
+          gameRecords: newRecords,
+          lastInteraction: now,
+        );
+        _mockCouples[coupleId] = updated;
+        _mockControllers[coupleId]?.add(updated);
+      }
+    }
+  }
 }

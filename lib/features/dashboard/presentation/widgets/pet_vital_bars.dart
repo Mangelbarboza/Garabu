@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/garabu_theme.dart';
 import '../../../pet/domain/pet_model.dart';
 
-class PetVitalBars extends StatelessWidget {
+class PetVitalBars extends StatefulWidget {
   final PetModel pet;
   final bool isCompact;
 
@@ -12,41 +12,38 @@ class PetVitalBars extends StatelessWidget {
     this.isCompact = false,
   });
 
-  double _calculateHunger() {
-    if (pet.lastFedAt == null) return 0.4;
-    final diffHours = DateTime.now().difference(pet.lastFedAt!).inMinutes / 60.0;
-    // Se vacía en unas 6 horas
-    return (1.0 - (diffHours / 6.0)).clamp(0.05, 1.0);
+  @override
+  State<PetVitalBars> createState() => _PetVitalBarsState();
+}
+
+class _PetVitalBarsState extends State<PetVitalBars>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _chargeAnimController;
+
+  @override
+  void initState() {
+    super.initState();
+    _chargeAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1100),
+    )..repeat(reverse: true);
   }
 
-  double _calculateThirst() {
-    if (pet.lastWateredAt == null) return 0.5;
-    final diffHours = DateTime.now().difference(pet.lastWateredAt!).inMinutes / 60.0;
-    // Se vacía en unas 4 horas
-    return (1.0 - (diffHours / 4.0)).clamp(0.05, 1.0);
-  }
-
-  double _calculateEnergy() {
-    if (pet.isSleeping) return 1.0;
-    // Energía estándar si está despierto
-    return 0.75;
-  }
-
-  double _calculateHappiness() {
-    if (pet.lastPettedAt == null) return 0.5;
-    final diffMinutes = DateTime.now().difference(pet.lastPettedAt!).inSeconds / 60.0;
-    // Se mantiene alto por 30 minutos tras acariciar
-    return (1.0 - (diffMinutes / 30.0)).clamp(0.15, 1.0);
+  @override
+  void dispose() {
+    _chargeAnimController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final hunger = _calculateHunger();
-    final thirst = _calculateThirst();
-    final energy = _calculateEnergy();
-    final happiness = _calculateHappiness();
+    final pet = widget.pet;
+    final hunger = pet.hunger;
+    final thirst = pet.thirst;
+    final energy = pet.energy;
+    final happiness = pet.happiness;
 
-    if (isCompact) {
+    if (widget.isCompact) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
@@ -68,7 +65,12 @@ class PetVitalBars extends StatelessWidget {
             const SizedBox(width: 8),
             _buildMiniBar(icon: Icons.water_drop_rounded, value: thirst, color: const Color(0xFF64B5F6)),
             const SizedBox(width: 8),
-            _buildMiniBar(icon: Icons.bedtime_rounded, value: energy, color: const Color(0xFFFFB74D)),
+            _buildMiniBar(
+              icon: pet.isSleeping ? Icons.bolt_rounded : Icons.bedtime_rounded,
+              value: energy,
+              color: pet.isSleeping ? const Color(0xFFFFD54F) : const Color(0xFFFFB74D),
+              isCharging: pet.isSleeping,
+            ),
             const SizedBox(width: 8),
             _buildMiniBar(icon: Icons.favorite_rounded, value: happiness, color: const Color(0xFFF06292)),
           ],
@@ -77,15 +79,15 @@ class PetVitalBars extends StatelessWidget {
     }
 
     return Container(
-      width: 170,
+      width: 175,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.9),
+        color: Colors.white.withValues(alpha: 0.94),
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: GarabuTheme.warmSand.withValues(alpha: 0.8), width: 1.2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.04),
+            color: Colors.black.withValues(alpha: 0.05),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -95,27 +97,71 @@ class PetVitalBars extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Nivel y barra de EXP
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.stars_rounded, color: Color(0xFFFFA000), size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Nvl. ${pet.level}',
+                    style: const TextStyle(
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.bold,
+                      color: GarabuTheme.deepEspresso,
+                    ),
+                  ),
+                ],
+              ),
+              Text(
+                '${pet.experience}/${pet.maxExperienceForLevel} EXP',
+                style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: GarabuTheme.textSecondary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              height: 5,
+              child: LinearProgressIndicator(
+                value: pet.levelProgress,
+                backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.35),
+                valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFFFFA000)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+
+          // Barras de vitalidad
           _buildStatRow(
             label: 'Hambre',
             icon: Icons.restaurant_rounded,
             value: hunger,
             barColor: const Color(0xFFE57373),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7),
           _buildStatRow(
             label: 'Sed',
             icon: Icons.water_drop_rounded,
             value: thirst,
             barColor: const Color(0xFF64B5F6),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7),
           _buildStatRow(
-            label: 'Energía',
-            icon: Icons.bedtime_rounded,
+            label: pet.isSleeping ? 'Cargando...' : 'Energía',
+            icon: pet.isSleeping ? Icons.bolt_rounded : Icons.bedtime_rounded,
             value: energy,
-            barColor: const Color(0xFFFFB74D),
+            barColor: pet.isSleeping ? const Color(0xFFFFD54F) : const Color(0xFFFFB74D),
+            isCharging: pet.isSleeping,
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 7),
           _buildStatRow(
             label: 'Ánimo',
             icon: Icons.favorite_rounded,
@@ -131,6 +177,7 @@ class PetVitalBars extends StatelessWidget {
     required IconData icon,
     required double value,
     required Color color,
+    bool isCharging = false,
   }) {
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -142,11 +189,25 @@ class PetVitalBars extends StatelessWidget {
           child: SizedBox(
             width: 28,
             height: 6,
-            child: LinearProgressIndicator(
-              value: value,
-              backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.4),
-              valueColor: AlwaysStoppedAnimation<Color>(color),
-            ),
+            child: isCharging
+                ? AnimatedBuilder(
+                    animation: _chargeAnimController,
+                    builder: (context, _) {
+                      return Opacity(
+                        opacity: 0.6 + (_chargeAnimController.value * 0.4),
+                        child: LinearProgressIndicator(
+                          value: value,
+                          backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.4),
+                          valueColor: AlwaysStoppedAnimation<Color>(color),
+                        ),
+                      );
+                    },
+                  )
+                : LinearProgressIndicator(
+                    value: value,
+                    backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.4),
+                    valueColor: AlwaysStoppedAnimation<Color>(color),
+                  ),
           ),
         ),
       ],
@@ -158,6 +219,7 @@ class PetVitalBars extends StatelessWidget {
     required IconData icon,
     required double value,
     required Color barColor,
+    bool isCharging = false,
   }) {
     final percent = (value * 100).toInt();
 
@@ -182,7 +244,7 @@ class PetVitalBars extends StatelessWidget {
               style: TextStyle(
                 fontSize: 10,
                 fontWeight: FontWeight.bold,
-                color: GarabuTheme.textSecondary.withValues(alpha: 0.8),
+                color: isCharging ? const Color(0xFFF57F17) : GarabuTheme.textSecondary.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -192,18 +254,32 @@ class PetVitalBars extends StatelessWidget {
           borderRadius: BorderRadius.circular(6),
           child: SizedBox(
             height: 7,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween<double>(begin: 0.0, end: value),
-              duration: const Duration(milliseconds: 600),
-              curve: Curves.easeOutCubic,
-              builder: (context, animValue, _) {
-                return LinearProgressIndicator(
-                  value: animValue,
-                  backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.4),
-                  valueColor: AlwaysStoppedAnimation<Color>(barColor),
-                );
-              },
-            ),
+            child: isCharging
+                ? AnimatedBuilder(
+                    animation: _chargeAnimController,
+                    builder: (context, _) {
+                      return Opacity(
+                        opacity: 0.65 + (_chargeAnimController.value * 0.35),
+                        child: LinearProgressIndicator(
+                          value: value,
+                          backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.4),
+                          valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                        ),
+                      );
+                    },
+                  )
+                : TweenAnimationBuilder<double>(
+                    tween: Tween<double>(begin: 0.0, end: value),
+                    duration: const Duration(milliseconds: 600),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, animValue, _) {
+                      return LinearProgressIndicator(
+                        value: animValue,
+                        backgroundColor: GarabuTheme.warmSand.withValues(alpha: 0.4),
+                        valueColor: AlwaysStoppedAnimation<Color>(barColor),
+                      );
+                    },
+                  ),
           ),
         ),
       ],

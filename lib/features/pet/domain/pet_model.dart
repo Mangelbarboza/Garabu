@@ -176,6 +176,8 @@ class PetModel {
   final DateTime? sleepStartedAt;
   final DateTime? lastSleptAt;
   final bool isSleeping;
+  final int level;
+  final int experience;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -203,6 +205,8 @@ class PetModel {
     this.foodInventory = const {},
     this.customPhrases = defaultPhrases,
     this.coins = 999,
+    this.level = 1,
+    this.experience = 0,
     this.lastFedAt,
     this.lastWateredAt,
     this.lastPettedAt,
@@ -213,9 +217,12 @@ class PetModel {
     required this.updatedAt,
   });
 
-  /// Hasta 2 prendas seleccionadas simultáneamente con retrocompatibilidad
+  int get maxExperienceForLevel => level * 100;
+  double get levelProgress => (experience / maxExperienceForLevel).clamp(0.0, 1.0);
+
+  /// Hasta 5 prendas seleccionadas simultáneamente con retrocompatibilidad
   List<String> get resolvedEquippedGarmentIds {
-    if (equippedGarmentIds.isNotEmpty) return equippedGarmentIds;
+    if (equippedGarmentIds.isNotEmpty) return equippedGarmentIds.take(5).toList();
     if (activeGarmentId != null && activeGarmentId!.isNotEmpty) return [activeGarmentId!];
     return [];
   }
@@ -259,12 +266,12 @@ class PetModel {
     }
   }
 
-  /// El personaje enferma si pasa la noche entera despierto (>19.5h continuas y energía crítica)
+  /// El personaje enferma si pasa más de 24h continuas despierto y energía crítica
   bool get isSick {
     if (isSleeping) return false;
     final wakeTime = lastSleptAt ?? createdAt;
     final awakeHours = DateTime.now().difference(wakeTime).inMinutes / 60.0;
-    return awakeHours >= 19.5 && energy <= 0.10;
+    return awakeHours >= 24.0 && energy <= 0.05;
   }
 
   double get happiness {
@@ -296,6 +303,8 @@ class PetModel {
       'foodInventory': foodInventory,
       'customPhrases': customPhrases,
       'coins': coins,
+      'level': level,
+      'experience': experience,
       'lastFedAt': lastFedAt?.toIso8601String(),
       'lastWateredAt': lastWateredAt?.toIso8601String(),
       'lastPettedAt': lastPettedAt?.toIso8601String(),
@@ -382,6 +391,8 @@ class PetModel {
       foodInventory: rawInventory,
       customPhrases: rawPhrases,
       coins: rawCoins,
+      level: (map['level'] as num?)?.toInt() ?? 1,
+      experience: (map['experience'] as num?)?.toInt() ?? 0,
       lastFedAt: map['lastFedAt'] != null
           ? DateTime.tryParse(map['lastFedAt'])
           : null,
@@ -424,6 +435,8 @@ class PetModel {
     Map<String, int>? foodInventory,
     List<String>? customPhrases,
     int? coins,
+    int? level,
+    int? experience,
     DateTime? lastFedAt,
     DateTime? lastWateredAt,
     DateTime? lastPettedAt,
@@ -450,6 +463,8 @@ class PetModel {
       foodInventory: foodInventory ?? this.foodInventory,
       customPhrases: customPhrases ?? this.customPhrases,
       coins: coins ?? this.coins,
+      level: level ?? this.level,
+      experience: experience ?? this.experience,
       lastFedAt: lastFedAt ?? this.lastFedAt,
       lastWateredAt: lastWateredAt ?? this.lastWateredAt,
       lastPettedAt: lastPettedAt ?? this.lastPettedAt,

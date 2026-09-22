@@ -68,7 +68,7 @@ const List<CatalogItem> kClothingCatalog = [
     category: ClothingCategory.bows,
     price: 20,
     defaultOffsetX: 0,
-    defaultOffsetY: 12,
+    defaultOffsetY: -75,
     painter: _drawLazoRojo,
   ),
   CatalogItem(
@@ -76,8 +76,8 @@ const List<CatalogItem> kClothingCatalog = [
     name: 'Lazo Coquette Rosa',
     category: ClothingCategory.bows,
     price: 22,
-    defaultOffsetX: 0,
-    defaultOffsetY: 12,
+    defaultOffsetX: 35,
+    defaultOffsetY: -70,
     painter: _drawLazoRosa,
   ),
   CatalogItem(
@@ -86,7 +86,7 @@ const List<CatalogItem> kClothingCatalog = [
     category: ClothingCategory.bows,
     price: 24,
     defaultOffsetX: 0,
-    defaultOffsetY: 14,
+    defaultOffsetY: -72,
     painter: _drawLazoMarinero,
   ),
   CatalogItem(
@@ -94,8 +94,8 @@ const List<CatalogItem> kClothingCatalog = [
     name: 'Lazo Gótico Negro',
     category: ClothingCategory.bows,
     price: 26,
-    defaultOffsetX: 0,
-    defaultOffsetY: 12,
+    defaultOffsetX: -32,
+    defaultOffsetY: -70,
     painter: _drawLazoGotico,
   ),
   CatalogItem(
@@ -104,7 +104,7 @@ const List<CatalogItem> kClothingCatalog = [
     category: ClothingCategory.bows,
     price: 30,
     defaultOffsetX: 0,
-    defaultOffsetY: 18,
+    defaultOffsetY: -5,
     painter: _drawCorbatin,
   ),
 

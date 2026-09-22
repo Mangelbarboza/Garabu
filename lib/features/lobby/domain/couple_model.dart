@@ -14,6 +14,7 @@ class CoupleModel {
   final String? user2PetId;
   final String? activePetId;
   final String status; // 'waiting_partner' | 'drawing_body' | 'drawing_clothes' | 'ready'
+  final Map<String, int> gameRecords;
   final DateTime createdAt;
 
   const CoupleModel({
@@ -32,6 +33,7 @@ class CoupleModel {
     this.user2PetId,
     this.activePetId,
     required this.status,
+    this.gameRecords = const {},
     required this.createdAt,
   });
 
@@ -55,6 +57,7 @@ class CoupleModel {
       'user2PetId': user2PetId,
       'activePetId': activePetId ?? petId ?? user1PetId,
       'status': status,
+      'gameRecords': gameRecords,
       'createdAt': createdAt.toIso8601String(),
     };
   }
@@ -64,6 +67,10 @@ class CoupleModel {
     final rawUser1PetId = map['user1PetId'] as String? ?? rawPetId;
     final rawUser2PetId = map['user2PetId'] as String?;
     final rawActivePetId = map['activePetId'] as String? ?? rawUser1PetId;
+    final rawRecords = (map['gameRecords'] as Map<String, dynamic>?)?.map(
+          (k, v) => MapEntry(k, (v as num).toInt()),
+        ) ??
+        const <String, int>{};
 
     return CoupleModel(
       id: docId,
@@ -83,6 +90,7 @@ class CoupleModel {
       user2PetId: rawUser2PetId,
       activePetId: rawActivePetId,
       status: map['status'] ?? 'waiting_partner',
+      gameRecords: rawRecords,
       createdAt: map['createdAt'] != null
           ? DateTime.tryParse(map['createdAt']) ?? DateTime.now()
           : DateTime.now(),
@@ -105,6 +113,7 @@ class CoupleModel {
     String? user2PetId,
     String? activePetId,
     String? status,
+    Map<String, int>? gameRecords,
     DateTime? createdAt,
   }) {
     return CoupleModel(
@@ -123,6 +132,7 @@ class CoupleModel {
       user2PetId: user2PetId ?? this.user2PetId,
       activePetId: activePetId ?? this.activePetId,
       status: status ?? this.status,
+      gameRecords: gameRecords ?? this.gameRecords,
       createdAt: createdAt ?? this.createdAt,
     );
   }

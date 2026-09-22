@@ -138,5 +138,97 @@ void main() {
       expect(fromMap.user2PetId, 'pet_user2');
       expect(fromMap.activePetId, 'pet_user2');
     });
+
+    test('PetModel maneja niveles y experiencia acumulada correctamente', () {
+      final now = DateTime.now();
+      final petLvl1 = PetModel(
+        id: 'pet_exp',
+        coupleId: 'cpl_1',
+        name: 'Garabu',
+        bodyImageUrl: 'url',
+        eyesConfig: const EyesConfig(
+          leftEye: RelativePoint(x: 0.4, y: 0.4),
+          rightEye: RelativePoint(x: 0.6, y: 0.4),
+        ),
+        level: 1,
+        experience: 50,
+        createdAt: now,
+        updatedAt: now,
+      );
+
+      expect(petLvl1.level, 1);
+      expect(petLvl1.experience, 50);
+      expect(petLvl1.maxExperienceForLevel, 100);
+      expect(petLvl1.levelProgress, 0.5);
+
+      final petLvl3 = petLvl1.copyWith(level: 3, experience: 90);
+      expect(petLvl3.maxExperienceForLevel, 300); // 3 * 100
+      expect((petLvl3.levelProgress * 100).round(), 30);
+    });
+
+    test('PetModel soporta equipar hasta 5 prendas simultáneas con offsets', () {
+      final now = DateTime.now();
+      final pet = PetModel(
+        id: 'pet_closet_5',
+        coupleId: 'cpl_1',
+        name: 'Garabu Fashion',
+        bodyImageUrl: 'url',
+        eyesConfig: const EyesConfig(
+          leftEye: RelativePoint(x: 0.4, y: 0.4),
+          rightEye: RelativePoint(x: 0.6, y: 0.4),
+        ),
+        equippedGarmentIds: ['g1', 'g2', 'g3', 'g4', 'g5'],
+        createdAt: now,
+        updatedAt: now,
+        closet: List.generate(
+          5,
+          (i) => GarmentItem(
+            id: 'g${i + 1}',
+            name: 'Prenda ${i + 1}',
+            imageUrl: 'cloth_$i',
+            createdAt: now,
+            offsetX: i * 5.0,
+            offsetY: -i * 10.0,
+          ),
+        ),
+      );
+
+      expect(pet.resolvedEquippedGarmentIds.length, 5);
+      expect(pet.resolvedEquippedGarmentIds, ['g1', 'g2', 'g3', 'g4', 'g5']);
+
+      final map = pet.toMap();
+      final fromMap = PetModel.fromMap(map, 'pet_closet_5');
+      expect(fromMap.resolvedEquippedGarmentIds.length, 5);
+      expect(fromMap.closet[2].offsetY, -20.0);
+    });
+
+    test('CoupleModel maneja records de minijuegos para ambos usuarios', () {
+      final now = DateTime.now();
+      final couple = CoupleModel(
+        id: 'cpl_records',
+        user1Id: 'u1',
+        user1Name: 'Angel',
+        user2Id: 'u2',
+        user2Name: 'Maria',
+        inviteCode: '112233',
+        streak: 3,
+        lastInteraction: now,
+        status: 'ready',
+        createdAt: now,
+        gameRecords: {
+          'atrapa_garabutos_u1': 140,
+          'atrapa_garabutos_u2': 180,
+          'trivia_pareja_u1': 120,
+        },
+      );
+
+      expect(couple.gameRecords['atrapa_garabutos_u1'], 140);
+      expect(couple.gameRecords['atrapa_garabutos_u2'], 180);
+      expect(couple.gameRecords['trivia_pareja_u1'], 120);
+
+      final map = couple.toMap();
+      final fromMap = CoupleModel.fromMap(map, 'cpl_records');
+      expect(fromMap.gameRecords['atrapa_garabutos_u2'], 180);
+    });
   });
 }

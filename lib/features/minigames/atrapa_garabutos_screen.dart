@@ -2,9 +2,12 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../auth/data/auth_repository.dart';
 import '../../core/theme/garabu_theme.dart';
 import '../../core/widgets/garabu_image.dart';
 import '../../core/widgets/notebook_background.dart';
+import '../lobby/data/lobby_repository.dart';
+import '../lobby/domain/couple_model.dart';
 import '../canvas/presentation/widgets/eye_widget.dart';
 import '../pet/data/pet_repository.dart';
 import '../pet/domain/pet_model.dart';
@@ -111,10 +114,12 @@ class ScorePopup {
 
 class AtrapaGarabutosScreen extends ConsumerStatefulWidget {
   final PetModel pet;
+  final CoupleModel? couple;
 
   const AtrapaGarabutosScreen({
     super.key,
     required this.pet,
+    this.couple,
   });
 
   @override
@@ -320,6 +325,19 @@ class _AtrapaGarabutosScreenState extends ConsumerState<AtrapaGarabutosScreen>
     final petRepo = ref.read(petRepositoryProvider);
     await petRepo.addCoins(petId: widget.pet.id, amount: earnedCoins);
     await petRepo.petAnimal(petId: widget.pet.id); // Aumenta felicidad
+    await petRepo.addExperience(petId: widget.pet.id, expDelta: 40); // +40 EXP
+
+    // Guardar récord del usuario en la pareja
+    if (widget.couple != null) {
+      final authUser = ref.read(currentUserProvider);
+      final userId = authUser?.id ?? widget.couple!.user1Id;
+      await ref.read(lobbyRepositoryProvider).recordGameScore(
+            coupleId: widget.couple!.id,
+            gameKey: 'atrapa_garabutos',
+            userId: userId,
+            score: _score,
+          );
+    }
 
     if (!mounted) return;
 
@@ -371,9 +389,9 @@ class _AtrapaGarabutosScreenState extends ConsumerState<AtrapaGarabutosScreen>
                   const Icon(Icons.monetization_on_rounded, color: Color(0xFFFFA000), size: 22),
                   const SizedBox(width: 8),
                   Text(
-                    '+$earnedCoins Monedas Garabu',
+                    '+$earnedCoins Monedas | +40 EXP',
                     style: const TextStyle(
-                      fontSize: 14,
+                      fontSize: 13.5,
                       fontWeight: FontWeight.bold,
                       color: Color(0xFFE65100),
                     ),
@@ -687,6 +705,49 @@ class _AtrapaGarabutosScreenState extends ConsumerState<AtrapaGarabutosScreen>
                 ],
               ),
             ),
+
+            // Récords competitivos de la pareja
+            if (widget.couple != null)
+              Positioned(
+                top: 56,
+                left: 16,
+                right: 16,
+                child: Center(
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.92),
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: GarabuTheme.warmSand.withValues(alpha: 0.8)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.emoji_events_rounded, size: 14, color: Color(0xFFFFA000)),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${widget.couple!.user1Name}: ${widget.couple!.gameRecords['atrapa_garabutos_${widget.couple!.user1Id}'] ?? 0} pts',
+                          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: GarabuTheme.deepEspresso),
+                        ),
+                        if (widget.couple!.user2Name != null) ...[
+                          const SizedBox(width: 8),
+                          Text(
+                            '|  ${widget.couple!.user2Name}: ${widget.couple!.gameRecords['atrapa_garabutos_${widget.couple!.user2Id}'] ?? 0} pts',
+                            style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: GarabuTheme.primaryBrown),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ),
+              ),
           ],
         ),
       ),
