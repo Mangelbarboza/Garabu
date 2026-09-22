@@ -66,7 +66,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   final Random _random = Random();
   int _lastParticleTime = 0;
   int _lastPettedDbTime = 0;
-  Timer? _presenceTimer;
 
   // Desplegable de estadísticas en móviles
   bool _showStatsDrawer = false;
@@ -144,27 +143,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
         ref.read(lobbyRepositoryProvider).verifyAndUpdateDailyStreak(widget.couple.id);
       }
     });
-
-    // 6. Iniciar presencia en tiempo real (puntito verde)
-    _startPresenceHeartbeat();
-  }
-
-  void _startPresenceHeartbeat() {
-    _updatePresence();
-    _presenceTimer?.cancel();
-    _presenceTimer = Timer.periodic(const Duration(seconds: 45), (_) {
-      if (mounted) _updatePresence();
-    });
-  }
-
-  void _updatePresence() {
-    final user = ref.read(currentUserProvider);
-    if (user != null) {
-      ref.read(lobbyRepositoryProvider).updateUserPresence(
-        coupleId: widget.couple.id,
-        userId: user.id,
-      );
-    }
   }
 
   void _triggerInteraction() {
@@ -196,7 +174,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
   @override
   void dispose() {
-    _presenceTimer?.cancel();
     _animController.dispose();
     _squashController.dispose();
     _purrController.dispose();
@@ -520,8 +497,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Widget _buildCoupleStreakHearts(CoupleModel couple) {
     final hasU1 = couple.hasUser1InteractedToday();
     final hasU2 = couple.hasUser2InteractedToday();
-    final isU1Online = couple.isUser1Online();
-    final isU2Online = couple.isUser2Online();
 
     // Color de la racha (fuego naranja si activa, azul hielo si congelada)
     final streakColor = couple.isStreakFrozen
@@ -540,7 +515,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             _buildPersonHeart(
               name: couple.user1Name,
               hasInteracted: hasU1,
-              isOnline: isU1Online,
               streakColor: streakColor,
             ),
             const SizedBox(width: 8),
@@ -549,7 +523,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             _buildPersonHeart(
               name: couple.user2Name ?? 'Pareja',
               hasInteracted: hasU2,
-              isOnline: isU2Online,
               streakColor: streakColor,
             ),
           ],
@@ -561,44 +534,14 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Widget _buildPersonHeart({
     required String name,
     required bool hasInteracted,
-    required bool isOnline,
     required Color streakColor,
   }) {
     return Tooltip(
-      message: '$name: ${hasInteracted ? "Interactuó hoy ❤️" : "Falta interactuar hoy ⏳"}${isOnline ? " (En línea 🟢)" : ""}',
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // Corazón: Se enciende del color de la racha al interactuar hoy, o contorno apagado si no
-          Icon(
-            hasInteracted ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-            size: 16,
-            color: hasInteracted ? streakColor : const Color(0xFFBDBDBD),
-          ),
-
-          // Puntito verde al lado del corazón si la persona está dentro de la app en línea
-          if (isOnline)
-            Positioned(
-              right: -3,
-              bottom: -1,
-              child: Container(
-                width: 6,
-                height: 6,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF00E676),
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 1),
-                  boxShadow: [
-                    BoxShadow(
-                      color: const Color(0xFF00E676).withValues(alpha: 0.8),
-                      blurRadius: 3,
-                      spreadRadius: 0.5,
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        ],
+      message: '$name: ${hasInteracted ? "Interactuó hoy ❤️" : "Falta interactuar hoy ⏳"}',
+      child: Icon(
+        hasInteracted ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+        size: 16,
+        color: hasInteracted ? streakColor : const Color(0xFFBDBDBD),
       ),
     );
   }
@@ -606,8 +549,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   void _showStreakDetailsDialog(BuildContext context, CoupleModel couple) {
     final hasU1 = couple.hasUser1InteractedToday();
     final hasU2 = couple.hasUser2InteractedToday();
-    final isU1Online = couple.isUser1Online();
-    final isU2Online = couple.isUser2Online();
     final bothDone = couple.hasBothInteractedToday();
 
     showDialog(
@@ -661,7 +602,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             _buildPartnerStreakStatusTile(
               name: couple.user1Name,
               hasInteracted: hasU1,
-              isOnline: isU1Online,
             ),
             const SizedBox(height: 8),
 
@@ -669,7 +609,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             _buildPartnerStreakStatusTile(
               name: couple.user2Name ?? 'Pareja',
               hasInteracted: hasU2,
-              isOnline: isU2Online,
             ),
 
             if (couple.isStreakFrozen) ...[
@@ -732,7 +671,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
   Widget _buildPartnerStreakStatusTile({
     required String name,
     required bool hasInteracted,
-    required bool isOnline,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -765,26 +703,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
               ),
             ),
           ),
-          if (isOnline) ...[
-            Container(
-              width: 7,
-              height: 7,
-              decoration: const BoxDecoration(
-                color: Color(0xFF00E676),
-                shape: BoxShape.circle,
-              ),
-            ),
-            const SizedBox(width: 4),
-            const Text(
-              'En línea',
-              style: TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF2E7D32),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
           Text(
             hasInteracted ? 'Completado hoy 🔥' : 'Falta interactuar ⏳',
             style: TextStyle(

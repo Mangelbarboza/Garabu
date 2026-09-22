@@ -312,43 +312,9 @@ class LobbyRepository {
     }
   }
 
-  /// Actualiza la presencia en tiempo real del usuario (puntito verde)
-  Future<void> updateUserPresence({
-    required String coupleId,
-    required String userId,
-  }) async {
-    final now = DateTime.now();
-    CoupleModel? current;
-    if (_firestore != null) {
-      final doc = await _firestore!.collection('couples').doc(coupleId).get();
-      if (doc.exists && doc.data() != null) {
-        current = CoupleModel.fromMap(doc.data()!, doc.id);
-      }
-    } else {
-      current = _mockCouples[coupleId];
-    }
-    if (current == null) return;
-
-    final isUser1 = userId == current.user1Id;
-    final updates = <String, dynamic>{
-      isUser1 ? 'user1LastSeen' : 'user2LastSeen': now.toIso8601String(),
-    };
-
-    if (_firestore != null) {
-      await _firestore!.collection('couples').doc(coupleId).set(updates, SetOptions(merge: true));
-    } else {
-      if (_mockCouples.containsKey(coupleId)) {
-        final updated = current.copyWith(
-          user1LastSeen: isUser1 ? now : current.user1LastSeen,
-          user2LastSeen: !isUser1 ? now : current.user2LastSeen,
-        );
-        _mockCouples[coupleId] = updated;
-        _mockControllers[coupleId]?.add(updated);
-      }
-    }
-  }
-
-  /// Registra una interacción diaria (cosquillas, comida, minijuegos, luz, etc.) para un usuario
+  /// Registra una interacción diaria (cosquillas, comida, minijuegos, luz, etc.) para un usuario.
+  /// Altamente optimizado para el plan gratuito: solo escribe en Firestore cuando el usuario
+  /// aún no había completado su interacción de hoy o cuando se completa la racha de ambos.
   Future<void> recordUserInteraction({
     required String coupleId,
     required String userId,
@@ -368,17 +334,26 @@ class LobbyRepository {
     if (current == null) return;
 
     final isUser1 = userId == current.user1Id;
+    final alreadyDone = isUser1
+        ? (current.user1LastInteractionDate == todayStr)
+        : (current.user2LastInteractionDate == todayStr);
+
     final newUser1Date = isUser1 ? todayStr : current.user1LastInteractionDate;
     final newUser2Date = !isUser1 ? todayStr : current.user2LastInteractionDate;
-
     final bothDone = (newUser1Date == todayStr) && (newUser2Date == todayStr);
+    final streakAlreadyRecordedForToday = (current.lastStreakDate == todayStr);
+
+    // Evitar escrituras redundantes si este usuario ya tiene su corazón encendido hoy
+    // y la racha ya fue consolidada o el otro aún no ha interactuado
+    if (alreadyDone && (!bothDone || streakAlreadyRecordedForToday)) {
+      return;
+    }
 
     int newStreak = current.streak;
     bool isFrozen = current.isStreakFrozen;
     String? newStreakDate = current.lastStreakDate;
 
     if (bothDone) {
-      // Si ambos ya interactuaron hoy y la racha de hoy no se había consolidado
       if (current.lastStreakDate != todayStr) {
         if (current.lastStreakDate == null) {
           newStreak = max(current.streak, 1);
@@ -408,7 +383,6 @@ class LobbyRepository {
 
     final updates = <String, dynamic>{
       isUser1 ? 'user1LastInteractionDate' : 'user2LastInteractionDate': todayStr,
-      isUser1 ? 'user1LastSeen' : 'user2LastSeen': now.toIso8601String(),
       'lastInteraction': now.toIso8601String(),
       'streak': newStreak,
       'lastStreakDate': newStreakDate,
@@ -422,8 +396,6 @@ class LobbyRepository {
         final updated = current.copyWith(
           user1LastInteractionDate: newUser1Date,
           user2LastInteractionDate: newUser2Date,
-          user1LastSeen: isUser1 ? now : current.user1LastSeen,
-          user2LastSeen: !isUser1 ? now : current.user2LastSeen,
           lastInteraction: now,
           streak: newStreak,
           lastStreakDate: newStreakDate,
