@@ -40,6 +40,9 @@ class FeedBottomSheet extends StatelessWidget {
     final drawnFruits = pet.drawnFruits;
     final inventory = pet.foodInventory;
 
+    // Solo los productos con stock > 0 salen en la alacena
+    final availableItems = kAvailableFruits.where((f) => (inventory[f.key] ?? 0) > 0).toList();
+
     return Container(
       decoration: const BoxDecoration(
         color: GarabuTheme.cardSurface,
@@ -66,9 +69,9 @@ class FeedBottomSheet extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
 
-          // Encabezado
+          // Encabezado de la Alacena
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -76,7 +79,7 @@ class FeedBottomSheet extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Alimentar a ${pet.name}',
+                    'Alacena de ${pet.name}',
                     style: const TextStyle(
                       fontSize: 20,
                       fontWeight: FontWeight.bold,
@@ -85,7 +88,7 @@ class FeedBottomSheet extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   const Text(
-                    'Arrastra la comida a la boca de tu mascota',
+                    'Toca un alimento para dárselo en la boca',
                     style: TextStyle(
                       fontSize: 13,
                       color: GarabuTheme.textSecondary,
@@ -99,209 +102,108 @@ class FeedBottomSheet extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 16),
 
-          // Tarjeta de Acción: Dar Agua Fresca (Sed) - SIN EMOJIS
-          InkWell(
-            onTap: () {
-              Navigator.of(context).pop();
-              if (onWaterGiven != null) {
-                onWaterGiven!();
-              }
-            },
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          // Cuadrícula compacta estilo Alacena con cajoncitos (4 columnas)
+          if (availableItems.isEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
               decoration: BoxDecoration(
-                color: const Color(0xFFE1F5FE),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: const Color(0xFFB3E5FC)),
+                color: GarabuTheme.paperWhite,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: GarabuTheme.warmSand.withValues(alpha: 0.6)),
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  Container(
-                    width: 38,
-                    height: 38,
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.water_drop_rounded,
-                        color: Color(0xFF0288D1),
-                        size: 22,
-                      ),
+                  Icon(
+                    Icons.kitchen_rounded,
+                    size: 44,
+                    color: GarabuTheme.primaryBrown.withValues(alpha: 0.5),
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Tu alacena está vacía',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: GarabuTheme.deepEspresso,
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Dar agua fresca',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFF0277BD),
-                          ),
-                        ),
-                        Text(
-                          'Mantén a ${pet.name} hidratado',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: Color(0xFF01579B),
-                          ),
-                        ),
-                      ],
+                  const SizedBox(height: 4),
+                  const Text(
+                    'Ve a la tienda para conseguir frutas y agua fresca',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12.5,
+                      color: GarabuTheme.textSecondary,
                     ),
                   ),
-                  const Icon(Icons.arrow_forward_ios_rounded, size: 14, color: Color(0xFF0277BD)),
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop();
+                      ShopBottomSheet.show(context: context, pet: pet);
+                    },
+                    icon: const Icon(Icons.storefront_rounded, size: 18),
+                    label: const Text('Abrir Tienda'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: GarabuTheme.primaryBrown,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    ),
+                  ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 16),
+          ] else ...[
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: availableItems.length,
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 0.84,
+              ),
+              itemBuilder: (context, index) {
+                final fruit = availableItems[index];
+                final isDrawn = drawnFruits.containsKey(fruit.key);
+                final imageUrl = drawnFruits[fruit.key];
+                final count = inventory[fruit.key] ?? 0;
 
-          // Grid de las 6 frutas
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: kAvailableFruits.length,
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 0.82,
-            ),
-            itemBuilder: (context, index) {
-              final fruit = kAvailableFruits[index];
-              final isDrawn = drawnFruits.containsKey(fruit.key);
-              final imageUrl = drawnFruits[fruit.key];
-              final count = inventory[fruit.key] ?? 0;
-              final canFeed = isDrawn && count > 0;
-
-              return InkWell(
-                onTap: () {
-                  if (canFeed) {
+                return InkWell(
+                  onTap: () {
                     Navigator.of(context).pop();
                     if (onFruitFed != null) {
                       onFruitFed!(fruit);
                     }
-                  } else if (!isDrawn) {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
+                  },
+                  borderRadius: BorderRadius.circular(16),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: GarabuTheme.paperWhite,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: GarabuTheme.warmSand,
+                        width: 1.2,
                       ),
-                    );
-                  } else {
-                    // Está agotada, sugerir comprar en tienda
-                    Navigator.of(context).pop();
-                    ShopBottomSheet.show(context: context, pet: pet);
-                  }
-                },
-                borderRadius: BorderRadius.circular(16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: canFeed
-                        ? GarabuTheme.paperWhite
-                        : GarabuTheme.paperWhite.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: canFeed ? GarabuTheme.primaryBrown : GarabuTheme.warmSand,
-                      width: canFeed ? 1.8 : 1.0,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Stack(
-                    children: [
-                      Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            // Vista previa de imagen dibujada o círculo de color de la fruta
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isDrawn
-                                    ? Colors.white
-                                    : fruit.color.withValues(alpha: 0.2),
-                              ),
-                              clipBehavior: Clip.antiAlias,
-                              child: Center(
-                                child: isDrawn && imageUrl != null
-                                    ? Padding(
-                                        padding: const EdgeInsets.all(4.0),
-                                        child: GarabuImage(
-                                          imageUrl: imageUrl,
-                                          fit: BoxFit.contain,
-                                        ),
-                                      )
-                                    : Icon(
-                                        Icons.brush_rounded,
-                                        color: fruit.color,
-                                        size: 24,
-                                      ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-
-                            // Nombre de la fruta
-                            Text(
-                              fruit.name,
-                              style: const TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.bold,
-                                color: GarabuTheme.deepEspresso,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-
-                            // Estado / Botón
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: canFeed
-                                    ? const Color(0xFFE8F5E9)
-                                    : (!isDrawn
-                                        ? GarabuTheme.warmSand.withValues(alpha: 0.5)
-                                        : const Color(0xFFFFEBEE)),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                canFeed
-                                    ? 'Dar (x$count)'
-                                    : (!isDrawn ? 'Dibujar' : 'Agotada'),
-                                style: TextStyle(
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.bold,
-                                  color: canFeed
-                                      ? const Color(0xFF2E7D32)
-                                      : (!isDrawn
-                                          ? GarabuTheme.textSecondary
-                                          : const Color(0xFFC62828)),
-                                ),
-                              ),
-                            ),
-                          ],
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.04),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
                         ),
-                      ),
-
-                      // Contador badge si tiene existencias
-                      if (count > 0)
+                      ],
+                    ),
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+                    child: Stack(
+                      children: [
+                        // Insignia solo con el número de existencias
                         Positioned(
-                          top: 8,
-                          left: 8,
+                          top: 0,
+                          right: 2,
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                             decoration: BoxDecoration(
@@ -309,37 +211,89 @@ class FeedBottomSheet extends StatelessWidget {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              'x$count',
+                              '$count',
                               style: const TextStyle(
-                                fontSize: 10,
+                                fontSize: 10.5,
                                 fontWeight: FontWeight.bold,
                                 color: Colors.white,
                               ),
                             ),
                           ),
                         ),
-                    ],
+
+                        // Cajoncito: dibujo redondo + etiqueta con nombre
+                        Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const SizedBox(height: 4),
+                              Container(
+                                width: 42,
+                                height: 42,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: isDrawn
+                                      ? Colors.white
+                                      : fruit.color.withValues(alpha: 0.2),
+                                  border: Border.all(
+                                    color: fruit.color.withValues(alpha: 0.5),
+                                    width: 1.5,
+                                  ),
+                                ),
+                                clipBehavior: Clip.antiAlias,
+                                child: Center(
+                                  child: isDrawn && imageUrl != null
+                                      ? Padding(
+                                          padding: const EdgeInsets.all(3.0),
+                                          child: GarabuImage(
+                                            imageUrl: imageUrl,
+                                            fit: BoxFit.contain,
+                                          ),
+                                        )
+                                      : Icon(
+                                          Icons.brush_rounded,
+                                          color: fruit.color,
+                                          size: 18,
+                                        ),
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                fruit.name,
+                                textAlign: TextAlign.center,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: GarabuTheme.deepEspresso,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              );
-            },
-          ),
+                );
+              },
+            ),
+          ],
           const SizedBox(height: 14),
 
-          // Botón para ir a la Tienda
-          OutlinedButton.icon(
+          // Acceso a la Tienda
+          TextButton.icon(
             onPressed: () {
               Navigator.of(context).pop();
               ShopBottomSheet.show(context: context, pet: pet);
             },
-            icon: const Icon(Icons.storefront_rounded, size: 18),
-            label: const Text('Comprar más alimentos en la Tienda'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: GarabuTheme.primaryBrown,
-              side: const BorderSide(color: GarabuTheme.primaryBrown),
-              padding: const EdgeInsets.symmetric(vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
+            icon: const Icon(Icons.storefront_rounded, size: 18, color: GarabuTheme.primaryBrown),
+            label: const Text(
+              'Ir a la Tienda',
+              style: TextStyle(
+                color: GarabuTheme.primaryBrown,
+                fontWeight: FontWeight.bold,
+                fontSize: 13.5,
               ),
             ),
           ),

@@ -22,6 +22,8 @@ class EyeWidget extends StatelessWidget {
   final bool isHappy; // Ojos achinados felices estilo kawaii (^_^)
   final PetEmotion emotion;
 
+  final Offset lookDirection;
+
   const EyeWidget({
     super.key,
     this.size = 28.0,
@@ -31,6 +33,7 @@ class EyeWidget extends StatelessWidget {
     this.blinkProgress = 0.0,
     this.isHappy = false,
     this.emotion = PetEmotion.neutral,
+    this.lookDirection = Offset.zero,
   });
 
   @override
@@ -46,6 +49,7 @@ class EyeWidget extends StatelessWidget {
           blinkProgress: blinkProgress,
           isHappy: isHappy,
           emotion: emotion,
+          lookDirection: lookDirection,
         ),
       ),
     );
@@ -59,6 +63,7 @@ class _EyePainter extends CustomPainter {
   final double blinkProgress;
   final bool isHappy;
   final PetEmotion emotion;
+  final Offset lookDirection;
 
   _EyePainter({
     required this.color,
@@ -67,6 +72,7 @@ class _EyePainter extends CustomPainter {
     required this.blinkProgress,
     required this.isHappy,
     this.emotion = PetEmotion.neutral,
+    this.lookDirection = Offset.zero,
   });
 
   @override
@@ -77,11 +83,12 @@ class _EyePainter extends CustomPainter {
       hasEyelashes ? (size.height - eyeDiameter / 2) : (size.height / 2),
     );
 
-    final isCheer = isHappy || emotion == PetEmotion.happy;
+    final isLooking = lookDirection != Offset.zero;
+    final isCheer = (isHappy || emotion == PetEmotion.happy) && !isLooking;
     final isAsleep = emotion == PetEmotion.sleeping;
 
     // Si está achinado de felicidad (^_^) o totalmente cerrado por sueño o parpadeo
-    if (isCheer || isAsleep || blinkProgress >= 0.85) {
+    if (isCheer || isAsleep || (blinkProgress >= 0.85 && !isLooking)) {
       final linePaint = Paint()
         ..color = const Color(0xFF2C2420)
         ..style = PaintingStyle.stroke
@@ -148,25 +155,31 @@ class _EyePainter extends CustomPainter {
       ..strokeWidth = 2.0;
     canvas.drawCircle(eyeCenter, eyeDiameter / 2, borderPaint);
 
-    // Iris del color seleccionado
+    // Iris del color seleccionado con desplazamiento de mirada
     final irisRadius = eyeDiameter * 0.35;
+    final lookOffset = Offset(
+      lookDirection.dx.clamp(-1.0, 1.0) * (irisRadius * 0.45),
+      lookDirection.dy.clamp(-1.0, 1.0) * (irisRadius * 0.45),
+    );
+    final pupilCenter = eyeCenter + lookOffset;
+
     final irisPaint = Paint()
       ..color = color
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(eyeCenter, irisRadius, irisPaint);
+    canvas.drawCircle(pupilCenter, irisRadius, irisPaint);
 
     // Pupila oscura profunda
     final pupilPaint = Paint()
       ..color = const Color(0xFF151210)
       ..style = PaintingStyle.fill;
-    canvas.drawCircle(eyeCenter, irisRadius * 0.55, pupilPaint);
+    canvas.drawCircle(pupilCenter, irisRadius * 0.55, pupilPaint);
 
     // Brillo / Reflejo de luz
     final shinePaint = Paint()
       ..color = Colors.white
       ..style = PaintingStyle.fill;
     canvas.drawCircle(
-      eyeCenter + Offset(-irisRadius * 0.3, -irisRadius * 0.3),
+      pupilCenter + Offset(-irisRadius * 0.3, -irisRadius * 0.3),
       irisRadius * 0.28,
       shinePaint,
     );
@@ -202,7 +215,9 @@ class _EyePainter extends CustomPainter {
         oldDelegate.hasEyelashes != hasEyelashes ||
         oldDelegate.isLeft != isLeft ||
         oldDelegate.blinkProgress != blinkProgress ||
-        oldDelegate.isHappy != isHappy;
+        oldDelegate.isHappy != isHappy ||
+        oldDelegate.emotion != emotion ||
+        oldDelegate.lookDirection != lookDirection;
   }
 }
 
@@ -279,6 +294,7 @@ class StaticEyeOverlay extends StatelessWidget {
   final double blinkProgress;
   final bool isHappy;
   final PetEmotion emotion;
+  final Offset lookDirection;
 
   const StaticEyeOverlay({
     super.key,
@@ -291,6 +307,7 @@ class StaticEyeOverlay extends StatelessWidget {
     this.blinkProgress = 0.0,
     this.isHappy = false,
     this.emotion = PetEmotion.neutral,
+    this.lookDirection = Offset.zero,
   });
 
   @override
@@ -309,6 +326,7 @@ class StaticEyeOverlay extends StatelessWidget {
         blinkProgress: blinkProgress,
         isHappy: isHappy,
         emotion: emotion,
+        lookDirection: lookDirection,
       ),
     );
   }
@@ -408,12 +426,14 @@ class _BlinkingEyeOverlayState extends State<BlinkingEyeOverlay>
 class MouthWidget extends StatefulWidget {
   final double size;
   final bool isOpen;
+  final bool isChewing;
   final PetEmotion emotion;
 
   const MouthWidget({
     super.key,
     this.size = 24.0,
     this.isOpen = false,
+    this.isChewing = false,
     this.emotion = PetEmotion.neutral,
   });
 
@@ -421,8 +441,9 @@ class MouthWidget extends StatefulWidget {
   State<MouthWidget> createState() => _MouthWidgetState();
 }
 
-class _MouthWidgetState extends State<MouthWidget> with SingleTickerProviderStateMixin {
+class _MouthWidgetState extends State<MouthWidget> with TickerProviderStateMixin {
   late AnimationController _breatheController;
+  late AnimationController _chewController;
 
   @override
   void initState() {
@@ -431,26 +452,52 @@ class _MouthWidgetState extends State<MouthWidget> with SingleTickerProviderStat
       vsync: this,
       duration: const Duration(milliseconds: 2200),
     )..repeat(reverse: true);
+
+    _chewController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 200),
+    );
+    if (widget.isChewing) {
+      _chewController.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant MouthWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isChewing != oldWidget.isChewing) {
+      if (widget.isChewing) {
+        _chewController.repeat(reverse: true);
+      } else {
+        _chewController.stop();
+        _chewController.reset();
+      }
+    }
   }
 
   @override
   void dispose() {
     _breatheController.dispose();
+    _chewController.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedBuilder(
-      animation: _breatheController,
+      animation: Listenable.merge([_breatheController, _chewController]),
       builder: (context, _) {
         final breathe = widget.emotion == PetEmotion.sleeping ? _breatheController.value : 0.0;
+        final chew = widget.isChewing
+            ? _chewController.value
+            : (widget.isOpen ? 1.0 : 0.0);
+
         return SizedBox(
           width: widget.size,
           height: widget.size * 0.65,
           child: CustomPaint(
             painter: _MouthSmilePainter(
-              isOpen: widget.isOpen,
+              openProgress: chew,
               emotion: widget.emotion,
               breathe: breathe,
             ),
@@ -462,12 +509,12 @@ class _MouthWidgetState extends State<MouthWidget> with SingleTickerProviderStat
 }
 
 class _MouthSmilePainter extends CustomPainter {
-  final bool isOpen;
+  final double openProgress;
   final PetEmotion emotion;
   final double breathe;
 
   _MouthSmilePainter({
-    this.isOpen = false,
+    this.openProgress = 0.0,
     this.emotion = PetEmotion.neutral,
     this.breathe = 0.0,
   });
@@ -484,8 +531,8 @@ class _MouthSmilePainter extends CustomPainter {
       ..color = const Color(0xFF2C2420)
       ..style = PaintingStyle.fill;
 
-    // 1. Durmiendo: boquita pequeña 'o' relajada de respiración (no sonriendo forzadamente)
-    if (emotion == PetEmotion.sleeping) {
+    // 1. Durmiendo: boquita pequeña 'o' relajada de respiración
+    if (emotion == PetEmotion.sleeping && openProgress < 0.1) {
       final cx = size.width * 0.5;
       final cy = size.height * 0.5;
       final rx = (size.width * 0.13) + (breathe * 1.6);
@@ -497,13 +544,14 @@ class _MouthSmilePainter extends CustomPainter {
       return;
     }
 
-    // 2. Abierta / Comiendo
-    if (isOpen || emotion == PetEmotion.eating) {
+    // 2. Abierta o Masticando (openProgress > 0)
+    if (openProgress > 0.05 || emotion == PetEmotion.eating) {
+      final scale = openProgress.clamp(0.25, 1.0);
       final path = Path();
       path.moveTo(size.width * 0.1, size.height * 0.2);
       path.quadraticBezierTo(
         size.width * 0.5,
-        size.height * 1.15,
+        size.height * (0.35 + (scale * 0.8)),
         size.width * 0.9,
         size.height * 0.2,
       );
@@ -514,19 +562,19 @@ class _MouthSmilePainter extends CustomPainter {
         ..color = const Color(0xFFFF8B94)
         ..style = PaintingStyle.fill;
       final tonguePath = Path();
-      tonguePath.moveTo(size.width * 0.3, size.height * 0.55);
+      tonguePath.moveTo(size.width * 0.3, size.height * (0.4 + (scale * 0.15)));
       tonguePath.quadraticBezierTo(
         size.width * 0.5,
-        size.height * 1.08,
+        size.height * (0.4 + (scale * 0.7)),
         size.width * 0.7,
-        size.height * 0.55,
+        size.height * (0.4 + (scale * 0.15)),
       );
       tonguePath.close();
       canvas.drawPath(tonguePath, tonguePaint);
       return;
     }
 
-    // 3. Hambriento o Triste: boquita curvada hacia abajo :(
+    // 3. Hambriento o Triste
     if (emotion == PetEmotion.hungry || emotion == PetEmotion.sad) {
       final path = Path();
       path.moveTo(size.width * 0.18, size.height * 0.75);
@@ -550,35 +598,21 @@ class _MouthSmilePainter extends CustomPainter {
       return;
     }
 
-    // 5. Feliz: gran sonrisa alegre
-    if (emotion == PetEmotion.happy) {
-      final path = Path();
-      path.moveTo(size.width * 0.1, size.height * 0.25);
-      path.quadraticBezierTo(
-        size.width * 0.5,
-        size.height * 1.1,
-        size.width * 0.9,
-        size.height * 0.25,
-      );
-      canvas.drawPath(path, strokePaint);
-      return;
-    }
-
-    // 6. Neutral / normal
+    // 5. Feliz / Neutral: Sonrisa alegre por defecto
     final path = Path();
-    path.moveTo(size.width * 0.15, size.height * 0.35);
+    path.moveTo(size.width * 0.1, size.height * 0.26);
     path.quadraticBezierTo(
       size.width * 0.5,
-      size.height * 0.85,
-      size.width * 0.85,
-      size.height * 0.35,
+      size.height * 1.05,
+      size.width * 0.9,
+      size.height * 0.26,
     );
     canvas.drawPath(path, strokePaint);
   }
 
   @override
   bool shouldRepaint(covariant _MouthSmilePainter oldDelegate) =>
-      oldDelegate.isOpen != isOpen ||
+      oldDelegate.openProgress != openProgress ||
       oldDelegate.emotion != emotion ||
       oldDelegate.breathe != breathe;
 }

@@ -18,6 +18,7 @@ import '../../pet/domain/pet_model.dart';
 import 'widgets/closet_bottom_sheet.dart';
 import 'widgets/feed_bottom_sheet.dart';
 import 'widgets/game_center_bottom_sheet.dart';
+import 'widgets/language_bottom_sheet.dart';
 import 'widgets/mailbox_bottom_sheet.dart';
 import 'widgets/pet_vital_bars.dart';
 import 'widgets/shop_bottom_sheet.dart';
@@ -209,9 +210,15 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
 
     _happyStopTimer?.cancel();
     if (!_isPetHappy) {
+      String phrase;
+      if (pet.customPhrases.isNotEmpty && _random.nextDouble() < 0.6) {
+        phrase = pet.customPhrases[_random.nextInt(pet.customPhrases.length)];
+      } else {
+        phrase = _cutePurrMessages[_random.nextInt(_cutePurrMessages.length)];
+      }
       setState(() {
         _isPetHappy = true;
-        _speechBubbleText = _cutePurrMessages[_random.nextInt(_cutePurrMessages.length)];
+        _speechBubbleText = phrase;
       });
     }
 
@@ -300,10 +307,19 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       });
     }
 
+    String fedPhrase;
+    if (pet.customPhrases.isNotEmpty && _random.nextDouble() < 0.5) {
+      fedPhrase = pet.customPhrases[_random.nextInt(pet.customPhrases.length)];
+    } else if (fruit.key == 'agua') {
+      fedPhrase = '¡Glup glup! ¡Qué frescura!';
+    } else {
+      fedPhrase = '¡Ñam! ¡Crunch crunch!';
+    }
+
     setState(() {
       _isChewing = true;
       _isPetHappy = true;
-      _speechBubbleText = '¡Ñam! ¡Crunch crunch!';
+      _speechBubbleText = fedPhrase;
     });
 
     // Masticar con 2 rebotes
@@ -373,10 +389,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
     if (pet.isSleeping) return PetEmotion.sleeping;
     if (_isChewing || _isFeedingMouthHovered) return PetEmotion.eating;
     if (_isPetHappy) return PetEmotion.happy;
-    if (pet.hunger < 25) return PetEmotion.hungry;
-    if (pet.thirst < 25) return PetEmotion.thirsty;
-    if (pet.happiness < 30 || pet.energy < 20) return PetEmotion.sad;
-    return PetEmotion.neutral;
+    if (pet.hunger < 0.15) return PetEmotion.hungry;
+    if (pet.thirst < 0.15) return PetEmotion.thirsty;
+    if (pet.happiness < 0.15 || pet.energy < 0.15) return PetEmotion.sad;
+    return PetEmotion.happy;
+  }
+
+  Offset _calculateLookDirection(Size canvasSize) {
+    if (_heldFruit == null) return Offset.zero;
+    final renderBox = _petContainerKey.currentContext?.findRenderObject() as RenderBox?;
+    if (renderBox == null) return Offset.zero;
+    final localPos = renderBox.globalToLocal(_pointerPosition);
+    final petCenterX = canvasSize.width * 0.5;
+    final petCenterY = canvasSize.height * 0.45;
+    final dx = ((localPos.dx - petCenterX) / (canvasSize.width * 0.35)).clamp(-1.0, 1.0);
+    final dy = ((localPos.dy - petCenterY) / (canvasSize.height * 0.35)).clamp(-1.0, 1.0);
+    return Offset(dx, dy);
   }
 
   Widget _buildPetMouth(PetModel pet, Size canvasSize, PetEmotion emotion) {
@@ -389,7 +417,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
       top: mouthY - 8,
       child: MouthWidget(
         size: 32,
-        isOpen: _isFeedingMouthHovered || _isChewing,
+        isOpen: _heldFruit != null || _isFeedingMouthHovered || _isChewing,
+        isChewing: _isChewing,
         emotion: emotion,
       ),
     );
@@ -588,6 +617,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                     animation: _blinkController,
                                     builder: (context, _) {
                                       final double progress = pet.isSleeping ? 1.0 : _blinkController.value;
+                                      final lookDir = _calculateLookDirection(canvasSize);
                                       return Stack(
                                         children: [
                                           StaticEyeOverlay(
@@ -599,6 +629,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                             blinkProgress: progress,
                                             isHappy: _isPetHappy,
                                             emotion: petEmotion,
+                                            lookDirection: lookDir,
                                           ),
                                           StaticEyeOverlay(
                                             position: pet.eyesConfig.rightEye,
@@ -609,6 +640,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                             blinkProgress: progress,
                                             isHappy: _isPetHappy,
                                             emotion: petEmotion,
+                                            lookDirection: lookDir,
                                           ),
                                         ],
                                       );
@@ -724,7 +756,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                           padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 10.0),
                           child: Column(
                             children: [
-                              // 1. Barra Superior Nativa (Racha, Selector de Slots, Modo Noche, Editar Cuerpo, Salir)
+                              // 1. Barra Superior Nativa (Racha, Nombre de mascota, Lenguaje, Modo Noche, Editar Cuerpo, Salir)
                               Row(
                                 children: [
                                   // Racha con fueguito limpio y número
@@ -757,13 +789,35 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                   ),
                                   const SizedBox(width: 8),
 
-                                  // Selector de Slots de Personaje
+                                  // Nombre de la Mascota compartido y centrado
                                   Expanded(
                                     child: Center(
-                                      child: _buildSlotSelector(currentCouple),
+                                      child: Text(
+                                        pet.name,
+                                        textAlign: TextAlign.center,
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: GarabuTheme.deepEspresso,
+                                          letterSpacing: -0.3,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  const SizedBox(width: 8),
+                                  const SizedBox(width: 4),
+
+                                  // Botón de Enseñar Lenguaje
+                                  IconButton(
+                                    tooltip: 'Enseñar frases a ${pet.name}',
+                                    icon: const Icon(
+                                      Icons.record_voice_over_rounded,
+                                      color: GarabuTheme.primaryBrown,
+                                      size: 22,
+                                    ),
+                                    onPressed: () => LanguageBottomSheet.show(context, pet),
+                                  ),
 
                                   // Botón de Apagar / Encender la luz
                                   IconButton(
@@ -804,21 +858,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                     onPressed: () => ref.read(authRepositoryProvider).signOut(),
                                   ),
                                 ],
-                              ),
-
-                              // Nombre de la Mascota activa
-                              const SizedBox(height: 4),
-                              Text(
-                                pet.name,
-                                textAlign: TextAlign.center,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: GarabuTheme.deepEspresso,
-                                  letterSpacing: -0.5,
-                                ),
                               ),
 
                               // Barras de estadísticas compactas en móvil o toggle
@@ -940,7 +979,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
                                     _buildDockButton(
                                       icon: Icons.sports_esports_rounded,
                                       label: 'Juegos',
-                                      onTap: () => GameCenterBottomSheet.show(context),
+                                      onTap: () => GameCenterBottomSheet.show(context, pet),
                                     ),
                                   ],
                                 ),
@@ -1061,133 +1100,6 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen>
             );
           },
         ),
-      ),
-    );
-  }
-
-  Widget _buildSlotSelector(CoupleModel couple) {
-    final user1PetId = couple.resolvedUser1PetId;
-    final user2PetId = couple.user2PetId;
-    final activePetId = couple.resolvedActivePetId;
-
-    final isSlot1Active = activePetId == user1PetId;
-    final isSlot2Active = activePetId == user2PetId && user2PetId != null;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-      decoration: BoxDecoration(
-        color: GarabuTheme.warmSand.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // Slot 1 (Usuario 1)
-          InkWell(
-            onTap: () {
-              if (user1PetId != null && !isSlot1Active) {
-                ref.read(lobbyRepositoryProvider).switchActivePet(
-                  coupleId: couple.id,
-                  petId: user1PetId,
-                );
-              }
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: isSlot1Active ? GarabuTheme.primaryBrown : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Slot 1: ${couple.user1Name}',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: isSlot1Active ? Colors.white : GarabuTheme.deepEspresso,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(width: 4),
-          // Slot 2 (Usuario 2)
-          InkWell(
-            onTap: () async {
-              if (user2PetId != null) {
-                if (!isSlot2Active) {
-                  ref.read(lobbyRepositoryProvider).switchActivePet(
-                    coupleId: couple.id,
-                    petId: user2PetId,
-                  );
-                }
-              } else {
-                // Crear mascota para Slot 2
-                final petName = await showDialog<String>(
-                  context: context,
-                  builder: (ctx) {
-                    final controller = TextEditingController();
-                    return AlertDialog(
-                      backgroundColor: GarabuTheme.cardSurface,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                      title: Text('Personaje de ${couple.user2Name ?? "Pareja"}'),
-                      content: TextField(
-                        controller: controller,
-                        autofocus: true,
-                        decoration: const InputDecoration(
-                          hintText: 'Nombre de la mascota',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(ctx),
-                          child: const Text('Cancelar'),
-                        ),
-                        ElevatedButton(
-                          onPressed: () => Navigator.pop(ctx, controller.text.trim()),
-                          child: const Text('Comenzar boceto'),
-                        ),
-                      ],
-                    );
-                  },
-                );
-
-                if (petName != null && petName.isNotEmpty && mounted) {
-                  Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => BodyCanvasScreen(
-                        couple: couple,
-                        petName: petName,
-                      ),
-                    ),
-                  );
-                }
-              }
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-              decoration: BoxDecoration(
-                color: isSlot2Active ? GarabuTheme.primaryBrown : Colors.transparent,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                user2PetId != null
-                    ? 'Slot 2: ${couple.user2Name ?? "Pareja"}'
-                    : '+ Slot 2 (${couple.user2Name ?? "Pareja"})',
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.bold,
-                  color: isSlot2Active ? Colors.white : GarabuTheme.deepEspresso,
-                ),
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

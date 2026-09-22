@@ -168,12 +168,23 @@ class PetModel {
   final int activeBackgroundSlotIndex;
   final Map<String, String> drawnFruits;
   final Map<String, int> foodInventory;
+  final List<String> customPhrases;
+  final int coins;
   final DateTime? lastFedAt;
   final DateTime? lastWateredAt;
   final DateTime? lastPettedAt;
+  final DateTime? sleepStartedAt;
+  final DateTime? lastSleptAt;
   final bool isSleeping;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  static const List<String> defaultPhrases = [
+    '¡Te quiero un montón!',
+    '¡Qué rico día a tu lado!',
+    '¡Gracias por cuidarme tanto!',
+    '¡Eres mi persona favorita!',
+  ];
 
   const PetModel({
     required this.id,
@@ -190,9 +201,13 @@ class PetModel {
     this.activeBackgroundSlotIndex = 0,
     this.drawnFruits = const {},
     this.foodInventory = const {},
+    this.customPhrases = defaultPhrases,
+    this.coins = 999,
     this.lastFedAt,
     this.lastWateredAt,
     this.lastPettedAt,
+    this.sleepStartedAt,
+    this.lastSleptAt,
     this.isSleeping = false,
     required this.createdAt,
     required this.updatedAt,
@@ -216,26 +231,43 @@ class PetModel {
     return backgroundUrl;
   }
 
-  // Getters de salud y vitalidad
+  // Getters de salud y vitalidad normalizados (0.0 a 1.0)
   double get hunger {
-    if (lastFedAt == null) return 0.4;
+    if (lastFedAt == null) return 0.85;
     final diffHours = DateTime.now().difference(lastFedAt!).inMinutes / 60.0;
-    return (1.0 - (diffHours / 6.0)).clamp(0.05, 1.0);
+    return (1.0 - (diffHours / 8.0)).clamp(0.05, 1.0);
   }
 
   double get thirst {
-    if (lastWateredAt == null) return 0.5;
+    if (lastWateredAt == null) return 0.85;
     final diffHours = DateTime.now().difference(lastWateredAt!).inMinutes / 60.0;
-    return (1.0 - (diffHours / 4.0)).clamp(0.05, 1.0);
+    return (1.0 - (diffHours / 6.0)).clamp(0.05, 1.0);
   }
 
-  double get energy => isSleeping ? 1.0 : 0.75;
+  /// La energía aguanta mucho más (24h) y sube notablemente al mandar a dormir
+  double get energy {
+    if (isSleeping) {
+      if (sleepStartedAt == null) return 0.95;
+      final sleptMinutes = DateTime.now().difference(sleepStartedAt!).inMinutes;
+      final recovery = (sleptMinutes / 45.0).clamp(0.0, 1.0);
+      return (0.4 + (recovery * 0.6)).clamp(0.4, 1.0);
+    } else {
+      if (lastSleptAt == null) return 0.90;
+      final awakeHours = DateTime.now().difference(lastSleptAt!).inMinutes / 60.0;
+      return (1.0 - (awakeHours / 24.0)).clamp(0.10, 1.0);
+    }
+  }
 
   double get happiness {
-    if (lastPettedAt == null) return 0.5;
+    if (lastPettedAt == null) return 0.85;
     final diffMinutes = DateTime.now().difference(lastPettedAt!).inSeconds / 60.0;
-    return (1.0 - (diffMinutes / 30.0)).clamp(0.15, 1.0);
+    return (1.0 - (diffMinutes / 45.0)).clamp(0.15, 1.0);
   }
+
+  int get hungerPercent => (hunger * 100).round();
+  int get thirstPercent => (thirst * 100).round();
+  int get energyPercent => (energy * 100).round();
+  int get happinessPercent => (happiness * 100).round();
 
   Map<String, dynamic> toMap() {
     return {
@@ -253,9 +285,13 @@ class PetModel {
       'activeBackgroundSlotIndex': activeBackgroundSlotIndex,
       'drawnFruits': drawnFruits,
       'foodInventory': foodInventory,
+      'customPhrases': customPhrases,
+      'coins': coins,
       'lastFedAt': lastFedAt?.toIso8601String(),
       'lastWateredAt': lastWateredAt?.toIso8601String(),
       'lastPettedAt': lastPettedAt?.toIso8601String(),
+      'sleepStartedAt': sleepStartedAt?.toIso8601String(),
+      'lastSleptAt': lastSleptAt?.toIso8601String(),
       'isSleeping': isSleeping,
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
@@ -311,6 +347,13 @@ class PetModel {
         ) ??
         {};
 
+    final rawPhrases = (map['customPhrases'] as List<dynamic>?)
+            ?.map((e) => e.toString())
+            .toList() ??
+        PetModel.defaultPhrases;
+
+    final rawCoins = (map['coins'] as num?)?.toInt() ?? 999;
+
     return PetModel(
       id: docId,
       coupleId: map['coupleId'] ?? '',
@@ -328,6 +371,8 @@ class PetModel {
       activeBackgroundSlotIndex: (map['activeBackgroundSlotIndex'] as num?)?.toInt() ?? 0,
       drawnFruits: rawFruits,
       foodInventory: rawInventory,
+      customPhrases: rawPhrases,
+      coins: rawCoins,
       lastFedAt: map['lastFedAt'] != null
           ? DateTime.tryParse(map['lastFedAt'])
           : null,
@@ -336,6 +381,12 @@ class PetModel {
           : null,
       lastPettedAt: map['lastPettedAt'] != null
           ? DateTime.tryParse(map['lastPettedAt'])
+          : null,
+      sleepStartedAt: map['sleepStartedAt'] != null
+          ? DateTime.tryParse(map['sleepStartedAt'])
+          : null,
+      lastSleptAt: map['lastSleptAt'] != null
+          ? DateTime.tryParse(map['lastSleptAt'])
           : null,
       isSleeping: map['isSleeping'] as bool? ?? false,
       createdAt: map['createdAt'] != null
@@ -362,9 +413,13 @@ class PetModel {
     int? activeBackgroundSlotIndex,
     Map<String, String>? drawnFruits,
     Map<String, int>? foodInventory,
+    List<String>? customPhrases,
+    int? coins,
     DateTime? lastFedAt,
     DateTime? lastWateredAt,
     DateTime? lastPettedAt,
+    DateTime? sleepStartedAt,
+    DateTime? lastSleptAt,
     bool? isSleeping,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -384,9 +439,13 @@ class PetModel {
       activeBackgroundSlotIndex: activeBackgroundSlotIndex ?? this.activeBackgroundSlotIndex,
       drawnFruits: drawnFruits ?? this.drawnFruits,
       foodInventory: foodInventory ?? this.foodInventory,
+      customPhrases: customPhrases ?? this.customPhrases,
+      coins: coins ?? this.coins,
       lastFedAt: lastFedAt ?? this.lastFedAt,
       lastWateredAt: lastWateredAt ?? this.lastWateredAt,
       lastPettedAt: lastPettedAt ?? this.lastPettedAt,
+      sleepStartedAt: sleepStartedAt ?? this.sleepStartedAt,
+      lastSleptAt: lastSleptAt ?? this.lastSleptAt,
       isSleeping: isSleeping ?? this.isSleeping,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

@@ -6,10 +6,10 @@ import 'package:garabu/features/pet/domain/pet_model.dart';
 
 void main() {
   group('Interactive Feed & Drawing Canvas Tests', () {
-    test('kAvailableFruits contiene exactamente las 6 frutas solicitadas', () {
-      expect(kAvailableFruits.length, 6);
+    test('kAvailableFruits contiene los 7 items solicitados (6 frutas + agua)', () {
+      expect(kAvailableFruits.length, 7);
       final fruitKeys = kAvailableFruits.map((f) => f.key).toList();
-      expect(fruitKeys, containsAll(['manzana', 'naranja', 'pera', 'pina', 'banano', 'uva']));
+      expect(fruitKeys, containsAll(['manzana', 'naranja', 'pera', 'pina', 'banano', 'uva', 'agua']));
     });
 
     test('EyesConfig resolvedMouth calcula default y respeta mouth personalizado', () {
@@ -29,18 +29,20 @@ void main() {
       expect(configWithCustom.resolvedMouth.y, 0.55);
     });
 
-    test('PetModel serializa y deserializa foodInventory y mouth correctamente', () {
+    test('PetModel serializa y deserializa foodInventory, mouth, coins y customPhrases correctamente', () {
       final pet = PetModel(
         id: 'test_pet',
         coupleId: 'couple_1',
         name: 'Garabito',
+        coins: 120,
+        customPhrases: ['¡Hola amor!', '¡Tengo hambre!'],
         bodyImageUrl: 'http://example.com/body.png',
         eyesConfig: const EyesConfig(
           leftEye: RelativePoint(x: 0.35, y: 0.4),
           rightEye: RelativePoint(x: 0.65, y: 0.4),
           mouth: RelativePoint(x: 0.5, y: 0.52),
         ),
-        foodInventory: {'manzana': 3, 'uva': 1},
+        foodInventory: {'manzana': 3, 'uva': 1, 'agua': 2},
         lastPettedAt: DateTime(2026, 9, 21, 12, 0),
         createdAt: DateTime(2026, 9, 21),
         updatedAt: DateTime(2026, 9, 21),
@@ -53,6 +55,9 @@ void main() {
       expect(fromMapPet.eyesConfig.mouth?.y, 0.52);
       expect(fromMapPet.foodInventory['manzana'], 3);
       expect(fromMapPet.foodInventory['uva'], 1);
+      expect(fromMapPet.foodInventory['agua'], 2);
+      expect(fromMapPet.coins, 120);
+      expect(fromMapPet.customPhrases, containsAll(['¡Hola amor!', '¡Tengo hambre!']));
       expect(fromMapPet.lastPettedAt, isNotNull);
     });
 

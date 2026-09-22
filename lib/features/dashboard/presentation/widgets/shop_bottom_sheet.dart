@@ -11,12 +11,14 @@ class CatalogBackground {
   final String title;
   final String assetPath;
   final String description;
+  final int price;
 
   const CatalogBackground({
     required this.id,
     required this.title,
     required this.assetPath,
     required this.description,
+    this.price = 100,
   });
 }
 
@@ -26,30 +28,35 @@ const List<CatalogBackground> kCatalogBackgrounds = [
     title: 'Habitación Acogedora',
     assetPath: 'assets/backgrounds/habitacion_acogedora.jpg',
     description: 'Boceto de cuarto cálido con escritorio, plantas y ventana.',
+    price: 80,
   ),
   CatalogBackground(
     id: 'jardin_flores',
     title: 'Jardín de Flores',
     assetPath: 'assets/backgrounds/jardin_flores.jpg',
     description: 'Boceto de jardín al aire libre con flores, mariposas y cerca.',
+    price: 100,
   ),
   CatalogBackground(
     id: 'noche_estrellada',
     title: 'Noche Estrellada',
     assetPath: 'assets/backgrounds/noche_estrellada.jpg',
     description: 'Cielo nocturno de estrellas, luna y constelaciones.',
+    price: 120,
   ),
   CatalogBackground(
     id: 'cafeteria_paris',
     title: 'Cafetería de París',
     assetPath: 'assets/backgrounds/cafeteria_paris.jpg',
     description: 'Bistró parisino con sombrilla, mesita y croasán.',
+    price: 110,
   ),
   CatalogBackground(
     id: 'bosque_magico',
     title: 'Bosque Mágico',
     assetPath: 'assets/backgrounds/bosque_magico.jpg',
     description: 'Árbol sabio y mágico con farol y luciérnagas.',
+    price: 150,
   ),
 ];
 
@@ -78,7 +85,17 @@ class ShopBottomSheet extends ConsumerStatefulWidget {
 }
 
 class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
-  int _selectedTab = 0; // 0 = Alimentos, 1 = Fondos
+  int _selectedTab = 0; // 0 = Comida, 1 = Ropa, 2 = Fondos
+  String? _animatingItemKey;
+
+  Future<void> _onBuyItem(String key, int price) async {
+    setState(() => _animatingItemKey = key);
+    final petRepo = ref.read(petRepositoryProvider);
+    await petRepo.buyFruit(petId: widget.pet.id, fruitKey: key, quantity: 1, price: price);
+    Future.delayed(const Duration(milliseconds: 280), () {
+      if (mounted) setState(() => _animatingItemKey = null);
+    });
+  }
 
   Future<void> _applyBackgroundToSlot(PetModel pet, CatalogBackground bg) async {
     final petRepo = ref.read(petRepositoryProvider);
@@ -149,22 +166,12 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
       slotIndex: chosenSlot,
       customUrl: bg.assetPath,
     );
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('¡"${bg.title}" equipado con éxito en Slot #${chosenSlot + 1}!'),
-          backgroundColor: GarabuTheme.primaryBrown,
-        ),
-      );
-    }
   }
 
   @override
   Widget build(BuildContext context) {
     final petAsync = ref.watch(currentPetProvider(widget.pet.id));
     final pet = petAsync.value ?? widget.pet;
-    final petRepo = ref.read(petRepositoryProvider);
     final drawnFruits = pet.drawnFruits;
     final inventory = pet.foodInventory;
 
@@ -199,29 +206,32 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
           ),
           const SizedBox(height: 14),
 
-          // Encabezado
+          // Encabezado con saldo de Monedas Garabu
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+              Row(
                 children: [
-                  const Text(
-                    'Tienda Garabu',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: GarabuTheme.deepEspresso,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: const Color(0xFFFFD54F)),
                     ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    _selectedTab == 0
-                        ? 'Alimentos consumibles para tu mascota'
-                        : 'Fondos ilustrados estilo boceto',
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: GarabuTheme.textSecondary,
+                    child: Row(
+                      children: [
+                        const Icon(Icons.monetization_on_rounded, color: Color(0xFFFFA000), size: 18),
+                        const SizedBox(width: 5),
+                        Text(
+                          '${pet.coins}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: GarabuTheme.deepEspresso,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -232,93 +242,96 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          const SizedBox(height: 12),
 
-          // Selector de Pestañas
+          // Pestañas SOLO con iconos (sin nombres de texto)
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
               color: GarabuTheme.warmSand.withValues(alpha: 0.35),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(18),
             ),
             child: Row(
               children: [
+                // 1. Icono de Comida
                 Expanded(
                   child: GestureDetector(
                     onTap: () => setState(() => _selectedTab = 0),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       decoration: BoxDecoration(
                         color: _selectedTab == 0 ? Colors.white : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         boxShadow: _selectedTab == 0
                             ? [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
+                                  color: Colors.black.withValues(alpha: 0.06),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 )
                               ]
                             : null,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.restaurant_rounded,
-                            size: 16,
-                            color: _selectedTab == 0 ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Alimentos',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: _selectedTab == 0 ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
-                            ),
-                          ),
-                        ],
+                      child: Icon(
+                        Icons.restaurant_rounded,
+                        size: 22,
+                        color: _selectedTab == 0 ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
                       ),
                     ),
                   ),
                 ),
+
+                // 2. Icono de Ropa
                 Expanded(
                   child: GestureDetector(
                     onTap: () => setState(() => _selectedTab = 1),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       decoration: BoxDecoration(
                         color: _selectedTab == 1 ? Colors.white : Colors.transparent,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(14),
                         boxShadow: _selectedTab == 1
                             ? [
                                 BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.05),
+                                  color: Colors.black.withValues(alpha: 0.06),
                                   blurRadius: 4,
                                   offset: const Offset(0, 2),
                                 )
                               ]
                             : null,
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.wallpaper_rounded,
-                            size: 16,
-                            color: _selectedTab == 1 ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Fondos (5)',
-                            style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.bold,
-                              color: _selectedTab == 1 ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
-                            ),
-                          ),
-                        ],
+                      child: Icon(
+                        Icons.checkroom_rounded,
+                        size: 22,
+                        color: _selectedTab == 1 ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 3. Icono de Fondos
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => _selectedTab = 2),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(
+                        color: _selectedTab == 2 ? Colors.white : Colors.transparent,
+                        borderRadius: BorderRadius.circular(14),
+                        boxShadow: _selectedTab == 2
+                            ? [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.06),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                )
+                              ]
+                            : null,
+                      ),
+                      child: Icon(
+                        Icons.wallpaper_rounded,
+                        size: 22,
+                        color: _selectedTab == 2 ? GarabuTheme.primaryBrown : GarabuTheme.textSecondary,
                       ),
                     ),
                   ),
@@ -330,169 +343,136 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
 
           // Contenido de la pestaña
           if (_selectedTab == 0) ...[
-            // Tab 0: Grid de las 6 frutas
-            GridView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: kAvailableFruits.length,
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 3,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 14,
-                childAspectRatio: 0.84,
-              ),
-              itemBuilder: (context, index) {
-                final fruit = kAvailableFruits[index];
-                final isDrawn = drawnFruits.containsKey(fruit.key);
-                final count = inventory[fruit.key] ?? 0;
+            // Pestaña Comida (Frutas + Agua)
+            Expanded(
+              child: GridView.builder(
+                shrinkWrap: true,
+                itemCount: kAvailableFruits.length,
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 0.78,
+                ),
+                itemBuilder: (context, index) {
+                  final fruit = kAvailableFruits[index];
+                  final isDrawn = drawnFruits.containsKey(fruit.key);
+                  final count = inventory[fruit.key] ?? 0;
+                  final isAnimating = _animatingItemKey == fruit.key;
 
-                return Container(
-                  decoration: BoxDecoration(
-                    color: GarabuTheme.paperWhite,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: GarabuTheme.warmSand.withValues(alpha: 0.7),
-                      width: 1.2,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.03),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  padding: const EdgeInsets.all(8),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      // Botón con el color sólido característico de la fruta
-                      Stack(
-                        alignment: Alignment.topRight,
-                        children: [
-                          InkWell(
-                            onTap: () {
-                              if (!isDrawn) {
-                                Navigator.of(context).pop();
-                                Navigator.of(context).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
-                                  ),
-                                );
-                              } else {
-                                petRepo.buyFruit(petId: pet.id, fruitKey: fruit.key, quantity: 1);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('¡Compraste 1 ${fruit.name}! (Tienes ${count + 1})'),
-                                    duration: const Duration(seconds: 2),
-                                    backgroundColor: GarabuTheme.primaryBrown,
-                                  ),
-                                );
-                              }
-                            },
-                            borderRadius: BorderRadius.circular(24),
-                            child: Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                color: fruit.color,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: Colors.white,
-                                  width: 2.5,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: fruit.color.withValues(alpha: 0.4),
-                                    blurRadius: 6,
-                                    offset: const Offset(0, 2),
-                                  ),
-                                ],
-                              ),
-                              child: Icon(
-                                isDrawn ? Icons.shopping_bag_outlined : Icons.edit_rounded,
-                                size: 20,
-                                color: Colors.white,
-                              ),
-                            ),
+                  return AnimatedScale(
+                    scale: isAnimating ? 1.08 : 1.0,
+                    duration: const Duration(milliseconds: 180),
+                    curve: Curves.easeOutBack,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: GarabuTheme.paperWhite,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: isAnimating ? GarabuTheme.primaryBrown : GarabuTheme.warmSand.withValues(alpha: 0.7),
+                          width: isAnimating ? 2.0 : 1.2,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.03),
+                            blurRadius: 4,
+                            offset: const Offset(0, 2),
                           ),
-                          if (count > 0)
-                            Positioned(
-                              right: -2,
-                              top: -2,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                                decoration: BoxDecoration(
-                                  color: GarabuTheme.deepEspresso,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Text(
-                                  'x$count',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
+                        ],
+                      ),
+                      padding: const EdgeInsets.all(6),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // Botón del alimento con contador instantáneo
+                          Stack(
+                            alignment: Alignment.topRight,
+                            children: [
+                              InkWell(
+                                onTap: () {
+                                  if (!isDrawn) {
+                                    Navigator.of(context).pop();
+                                    Navigator.of(context).push(
+                                      MaterialPageRoute(
+                                        builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
+                                      ),
+                                    );
+                                  } else {
+                                    _onBuyItem(fruit.key, fruit.price);
+                                  }
+                                },
+                                borderRadius: BorderRadius.circular(24),
+                                child: Container(
+                                  width: 44,
+                                  height: 44,
+                                  decoration: BoxDecoration(
+                                    color: fruit.color,
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                      color: Colors.white,
+                                      width: 2.5,
+                                    ),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: fruit.color.withValues(alpha: 0.4),
+                                        blurRadius: 6,
+                                        offset: const Offset(0, 2),
+                                      ),
+                                    ],
+                                  ),
+                                  child: Icon(
+                                    isDrawn ? Icons.add_shopping_cart_rounded : Icons.edit_rounded,
+                                    size: 20,
                                     color: Colors.white,
                                   ),
                                 ),
                               ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
+                              if (count > 0)
+                                Positioned(
+                                  right: -2,
+                                  top: -2,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: GarabuTheme.deepEspresso,
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      '$count',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                          const SizedBox(height: 5),
 
-                      // Nombre de la fruta
-                      Text(
-                        fruit.name,
-                        textAlign: TextAlign.center,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: GarabuTheme.deepEspresso,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-
-                      // Estado: Dibujar o Comprar
-                      if (!isDrawn)
-                        InkWell(
-                          onTap: () {
-                            Navigator.of(context).pop();
-                            Navigator.of(context).push(
-                              MaterialPageRoute(
-                                builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
-                              ),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: GarabuTheme.warmSand.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Text(
-                              'Dibujar',
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w600,
-                                color: GarabuTheme.primaryBrown,
-                              ),
+                          // Nombre
+                          Text(
+                            fruit.name,
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: GarabuTheme.deepEspresso,
                             ),
                           ),
-                        )
-                      else
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
+                          const SizedBox(height: 3),
+
+                          // Precio e Interacción (SIN SNACKBAR)
+                          if (!isDrawn)
                             InkWell(
                               onTap: () {
-                                petRepo.buyFruit(petId: pet.id, fruitKey: fruit.key, quantity: 1);
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text('¡Compraste 1 ${fruit.name}! (Tienes ${count + 1})'),
-                                    duration: const Duration(seconds: 2),
-                                    backgroundColor: GarabuTheme.primaryBrown,
+                                Navigator.of(context).pop();
+                                Navigator.of(context).push(
+                                  MaterialPageRoute(
+                                    builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
                                   ),
                                 );
                               },
@@ -503,7 +483,7 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: const Text(
-                                  'Gratis',
+                                  'Dibujar',
                                   style: TextStyle(
                                     fontSize: 10,
                                     fontWeight: FontWeight.w600,
@@ -511,34 +491,93 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
                                   ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 4),
-                            Tooltip(
-                              message: 'Redibujar forma',
-                              child: InkWell(
-                                onTap: () {
-                                  Navigator.of(context).pop();
-                                  Navigator.of(context).push(
-                                    MaterialPageRoute(
-                                      builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
+                            )
+                          else
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                InkWell(
+                                  onTap: () => _onBuyItem(fruit.key, fruit.price),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFFFF8E1),
+                                      borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: const Color(0xFFFFD54F), width: 0.8),
                                     ),
-                                  );
-                                },
-                                child: const Padding(
-                                  padding: EdgeInsets.all(2.0),
-                                  child: Icon(Icons.edit_rounded, size: 12, color: GarabuTheme.textSecondary),
+                                    child: Text(
+                                      '🪙 ${fruit.price}',
+                                      style: const TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                        color: Color(0xFFE65100),
+                                      ),
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                const SizedBox(width: 3),
+                                Tooltip(
+                                  message: 'Redibujar',
+                                  child: InkWell(
+                                    onTap: () {
+                                      Navigator.of(context).pop();
+                                      Navigator.of(context).push(
+                                        MaterialPageRoute(
+                                          builder: (_) => FruitCanvasScreen(pet: pet, fruit: fruit),
+                                        ),
+                                      );
+                                    },
+                                    child: const Padding(
+                                      padding: EdgeInsets.all(2.0),
+                                      child: Icon(Icons.edit_rounded, size: 12, color: GarabuTheme.textSecondary),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                    ],
-                  ),
-                );
-              },
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ] else if (_selectedTab == 1) ...[
+            // Pestaña Ropa (Prendas y Accesorios en confección)
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.checkroom_rounded,
+                      size: 48,
+                      color: GarabuTheme.primaryBrown.withValues(alpha: 0.4),
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Taller de Ropa',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: GarabuTheme.deepEspresso,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 32.0),
+                      child: Text(
+                        'Crea prendas únicas dibujándolas sobre tu mascota en el Clóset. ¡Próximamente nuevos accesorios para comprar!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12.5, color: GarabuTheme.textSecondary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ] else ...[
-            // Tab 1: Lista de Fondos Temáticos
+            // Pestaña Fondos
             Expanded(
               child: ListView.separated(
                 itemCount: kCatalogBackgrounds.length,
@@ -566,19 +605,16 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
                     padding: const EdgeInsets.all(10),
                     child: Row(
                       children: [
-                        // Vista previa cuadrada del fondo boceto
                         ClipRRect(
                           borderRadius: BorderRadius.circular(12),
                           child: GarabuImage(
                             imageUrl: bg.assetPath,
-                            width: 72,
-                            height: 72,
+                            width: 68,
+                            height: 68,
                             fit: BoxFit.cover,
                           ),
                         ),
-                        const SizedBox(width: 14),
-
-                        // Información del fondo
+                        const SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -586,26 +622,33 @@ class _ShopBottomSheetState extends ConsumerState<ShopBottomSheet> {
                               Text(
                                 bg.title,
                                 style: const TextStyle(
-                                  fontSize: 15,
+                                  fontSize: 14.5,
                                   fontWeight: FontWeight.bold,
                                   color: GarabuTheme.deepEspresso,
                                 ),
                               ),
-                              const SizedBox(height: 3),
+                              const SizedBox(height: 2),
                               Text(
                                 bg.description,
                                 style: const TextStyle(
-                                  fontSize: 11.5,
+                                  fontSize: 11,
                                   color: GarabuTheme.textSecondary,
-                                  height: 1.25,
+                                  height: 1.2,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '🪙 ${bg.price}',
+                                style: const TextStyle(
+                                  fontSize: 11.5,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFFE65100),
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 10),
-
-                        // Botón de Equipar
+                        const SizedBox(width: 8),
                         ElevatedButton(
                           onPressed: () => _applyBackgroundToSlot(pet, bg),
                           style: ElevatedButton.styleFrom(

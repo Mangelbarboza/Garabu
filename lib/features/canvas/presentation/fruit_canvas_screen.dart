@@ -15,21 +15,24 @@ class FruitInfo {
   final String key;
   final String name;
   final Color color;
+  final int price;
 
   const FruitInfo({
     required this.key,
     required this.name,
     required this.color,
+    this.price = 10,
   });
 }
 
 const List<FruitInfo> kAvailableFruits = [
-  FruitInfo(key: 'manzana', name: 'Manzana', color: Color(0xFFE53935)),
-  FruitInfo(key: 'naranja', name: 'Naranja', color: Color(0xFFFB8C00)),
-  FruitInfo(key: 'pera', name: 'Pera', color: Color(0xFF7CB342)),
-  FruitInfo(key: 'pina', name: 'Piña', color: Color(0xFFFDD835)),
-  FruitInfo(key: 'banano', name: 'Banano', color: Color(0xFFFBC02D)),
-  FruitInfo(key: 'uva', name: 'Uva', color: Color(0xFF8E24AA)),
+  FruitInfo(key: 'agua', name: 'Agua', color: Color(0xFF29B6F6), price: 5),
+  FruitInfo(key: 'banano', name: 'Banano', color: Color(0xFFFBC02D), price: 8),
+  FruitInfo(key: 'manzana', name: 'Manzana', color: Color(0xFFE53935), price: 10),
+  FruitInfo(key: 'pera', name: 'Pera', color: Color(0xFF7CB342), price: 12),
+  FruitInfo(key: 'naranja', name: 'Naranja', color: Color(0xFFFB8C00), price: 15),
+  FruitInfo(key: 'uva', name: 'Uva', color: Color(0xFF8E24AA), price: 20),
+  FruitInfo(key: 'pina', name: 'Piña', color: Color(0xFFFDD835), price: 25),
 ];
 
 class FruitCanvasScreen extends ConsumerStatefulWidget {
@@ -348,7 +351,27 @@ class _FruitStencilPainter extends CustomPainter {
       case 'uva':
         _drawGrapeStencil(canvas, center, min(w, h) * 0.35, guidePaint, leafPaint);
         break;
+      case 'agua':
+        _drawWaterStencil(canvas, center, min(w, h) * 0.35, guidePaint);
+        break;
     }
+  }
+
+  void _drawWaterStencil(Canvas canvas, Offset center, double r, Paint guidePaint) {
+    final glass = Path();
+    glass.moveTo(center.dx - r * 0.55, center.dy - r * 0.8);
+    glass.lineTo(center.dx + r * 0.55, center.dy - r * 0.8);
+    glass.lineTo(center.dx + r * 0.4, center.dy + r * 0.8);
+    glass.quadraticBezierTo(center.dx, center.dy + r * 0.88, center.dx - r * 0.4, center.dy + r * 0.8);
+    glass.close();
+    canvas.drawPath(glass, guidePaint);
+
+    final waterLevel = Path();
+    waterLevel.moveTo(center.dx - r * 0.48, center.dy - r * 0.2);
+    waterLevel.quadraticBezierTo(center.dx, center.dy - r * 0.1, center.dx + r * 0.48, center.dy - r * 0.2);
+    canvas.drawPath(waterLevel, guidePaint);
+
+    canvas.drawCircle(center + Offset(0, r * 0.25), r * 0.12, guidePaint);
   }
 
   void _drawAppleStencil(Canvas canvas, Offset center, double r, Paint guidePaint, Paint leafPaint) {

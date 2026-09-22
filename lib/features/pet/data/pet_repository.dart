@@ -523,21 +523,26 @@ class PetRepository {
     required String petId,
     required String fruitKey,
     int quantity = 1,
+    int price = 0,
   }) async {
     final current = await getPet(petId);
     final inventory = Map<String, int>.from(current?.foodInventory ?? {});
     inventory[fruitKey] = (inventory[fruitKey] ?? 0) + quantity;
+    final currentCoins = current?.coins ?? 999;
+    final newCoins = (currentCoins - price).clamp(0, 999999);
     final now = DateTime.now();
 
     if (_firestore != null) {
       await _firestore!.collection('pets').doc(petId).set({
         'foodInventory': inventory,
+        'coins': newCoins,
         'updatedAt': now.toIso8601String(),
       }, SetOptions(merge: true));
     } else {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
           foodInventory: inventory,
+          coins: newCoins,
           updatedAt: now,
         );
         _mockPets[petId] = updated;
@@ -546,7 +551,94 @@ class PetRepository {
     }
   }
 
-  /// Alimentación: Dar fruta a la mascota (consume 1 del inventario)
+  /// Monedas: Agregar monedas (ganadas en minijuegos)
+  Future<void> addCoins({
+    required String petId,
+    required int amount,
+  }) async {
+    final current = await getPet(petId);
+    final currentCoins = current?.coins ?? 999;
+    final newCoins = (currentCoins + amount).clamp(0, 999999);
+    final now = DateTime.now();
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'coins': newCoins,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          coins: newCoins,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Enseñar Lenguaje: Agregar frase a la mascota (máx 100 caracteres)
+  Future<void> addCustomPhrase({
+    required String petId,
+    required String phrase,
+  }) async {
+    final clean = phrase.trim();
+    if (clean.isEmpty) return;
+    final text = clean.length > 100 ? clean.substring(0, 100) : clean;
+
+    final current = await getPet(petId);
+    final phrases = List<String>.from(current?.customPhrases ?? PetModel.defaultPhrases);
+    if (!phrases.contains(text)) {
+      phrases.add(text);
+    }
+    final now = DateTime.now();
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'customPhrases': phrases,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          customPhrases: phrases,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Enseñar Lenguaje: Eliminar frase
+  Future<void> removeCustomPhrase({
+    required String petId,
+    required String phrase,
+  }) async {
+    final current = await getPet(petId);
+    final phrases = List<String>.from(current?.customPhrases ?? PetModel.defaultPhrases);
+    phrases.remove(phrase);
+    final now = DateTime.now();
+
+    if (_firestore != null) {
+      await _firestore!.collection('pets').doc(petId).set({
+        'customPhrases': phrases,
+        'updatedAt': now.toIso8601String(),
+      }, SetOptions(merge: true));
+    } else {
+      if (_mockPets.containsKey(petId)) {
+        final updated = _mockPets[petId]!.copyWith(
+          customPhrases: phrases,
+          updatedAt: now,
+        );
+        _mockPets[petId] = updated;
+        _mockControllers[petId]?.add(updated);
+      }
+    }
+  }
+
+  /// Alimentación: Dar fruta/agua a la mascota (consume 1 del inventario)
   Future<void> feedPet({
     required String petId,
     required String fruitKey,
@@ -558,18 +650,24 @@ class PetRepository {
       inventory[fruitKey] = currentCount - 1;
     }
     final now = DateTime.now();
+    final isWater = fruitKey == 'agua';
 
     if (_firestore != null) {
-      await _firestore!.collection('pets').doc(petId).set({
+      final updateData = <String, dynamic>{
         'foodInventory': inventory,
         'lastFedAt': now.toIso8601String(),
         'updatedAt': now.toIso8601String(),
-      }, SetOptions(merge: true));
+      };
+      if (isWater) {
+        updateData['lastWateredAt'] = now.toIso8601String();
+      }
+      await _firestore!.collection('pets').doc(petId).set(updateData, SetOptions(merge: true));
     } else {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
           foodInventory: inventory,
           lastFedAt: now,
+          lastWateredAt: isWater ? now : current?.lastWateredAt,
           updatedAt: now,
         );
         _mockPets[petId] = updated;
@@ -622,21 +720,30 @@ class PetRepository {
     }
   }
 
-  /// Sueño: Apagar / Encender la luz
+  /// Sueño: Apagar / Encender la luz (con recuperación de energía)
   Future<void> toggleSleep({
     required String petId,
     required bool isSleeping,
   }) async {
     final now = DateTime.now();
+    final updateData = <String, dynamic>{
+      'isSleeping': isSleeping,
+      'updatedAt': now.toIso8601String(),
+    };
+    if (isSleeping) {
+      updateData['sleepStartedAt'] = now.toIso8601String();
+    } else {
+      updateData['lastSleptAt'] = now.toIso8601String();
+    }
+
     if (_firestore != null) {
-      await _firestore!.collection('pets').doc(petId).set({
-        'isSleeping': isSleeping,
-        'updatedAt': now.toIso8601String(),
-      }, SetOptions(merge: true));
+      await _firestore!.collection('pets').doc(petId).set(updateData, SetOptions(merge: true));
     } else {
       if (_mockPets.containsKey(petId)) {
         final updated = _mockPets[petId]!.copyWith(
           isSleeping: isSleeping,
+          sleepStartedAt: isSleeping ? now : _mockPets[petId]?.sleepStartedAt,
+          lastSleptAt: !isSleeping ? now : _mockPets[petId]?.lastSleptAt,
           updatedAt: now,
         );
         _mockPets[petId] = updated;
