@@ -52,7 +52,7 @@ class DefaultFirebaseOptions {
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyAmUJwpWVAAHGkE4rIvy0EO3LhTDo8PiEw',
-    appId: '1:759265755482:android:1ba96d50080874ba093363',
+    appId: '1:759265755482:android:737c57f1580d2ad0093363',
     messagingSenderId: '759265755482',
     projectId: 'garabu-a20b5',
     storageBucket: 'garabu-a20b5.firebasestorage.app',

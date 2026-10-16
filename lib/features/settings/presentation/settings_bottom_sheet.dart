@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/privacy_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/garabu_theme.dart';
 import '../../auth/data/auth_repository.dart';
@@ -284,6 +285,13 @@ class SettingsBottomSheet extends ConsumerWidget {
               ),
               child: Column(
                 children: [
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => const PrivacyScreen()),
+                    ),
+                    icon: const Icon(Icons.privacy_tip_outlined),
+                    label: const Text('Privacidad y eliminación de datos'),
+                  ),
                   // Botón Cerrar Sesión
                   SizedBox(
                     width: double.infinity,
@@ -588,7 +596,7 @@ class SettingsBottomSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Esta acción es IRREVERSIBLE. Se eliminará tu perfil de usuario y perderás de manera permanente el acceso a Garabu y a tus datos.',
+              'Esta acción es irreversible. Se eliminarán tu perfil y tus credenciales de acceso. Los contenidos compartidos pueden permanecer disponibles para la otra persona.',
               style: TextStyle(fontSize: 13.5, color: GarabuTheme.deepEspresso, height: 1.4),
             ),
             const SizedBox(height: 12),
@@ -605,7 +613,7 @@ class SettingsBottomSheet extends ConsumerWidget {
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'No podrás recuperar tu mascota ni tus artículos comprados.',
+                      'Para solicitar también la eliminación de contenido compartido, consulta Privacidad y eliminación de datos.',
                       style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: Color(0xFFC62828)),
                     ),
                   ),
@@ -621,9 +629,21 @@ class SettingsBottomSheet extends ConsumerWidget {
           ),
           ElevatedButton(
             onPressed: () async {
-              Navigator.of(ctx).pop();
-              Navigator.of(context).pop(); // cerrar bottom sheet
-              await ref.read(authRepositoryProvider).deleteAccount();
+              try {
+                await ref.read(authRepositoryProvider).deleteAccount();
+                if (ctx.mounted) Navigator.of(ctx).pop();
+                if (context.mounted) Navigator.of(context).pop();
+              } catch (error) {
+                if (!ctx.mounted) return;
+                Navigator.of(ctx).pop();
+                if (!context.mounted) return;
+                final message = error.toString().contains('requires-recent-login')
+                    ? 'Por seguridad, cierra sesión y vuelve a entrar antes de eliminar tu cuenta.'
+                    : 'No pudimos completar la eliminación. Inténtalo de nuevo o escribe al contacto de privacidad.';
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(message)),
+                );
+              }
             },
             style: ElevatedButton.styleFrom(
               backgroundColor: const Color(0xFFD32F2F),

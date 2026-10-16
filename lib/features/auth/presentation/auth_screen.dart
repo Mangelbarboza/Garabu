@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/privacy_screen.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/garabu_theme.dart';
 import '../data/auth_repository.dart';
@@ -267,6 +268,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                     ),
                     const SizedBox(height: 16),
 
+                    TextButton(
+                      onPressed: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(builder: (_) => const PrivacyScreen()),
+                      ),
+                      child: const Text('Privacidad y eliminación de datos'),
+                    ),
                     // Divisor "o"
                     const Row(
                       children: [
