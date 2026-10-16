@@ -246,18 +246,15 @@ class AuthRepository {
   Future<void> deleteAccount() async {
     final currentUid = _auth?.currentUser?.uid ?? _currentMockUser?.id;
     if (_auth != null && _auth!.currentUser != null) {
+      final lastSignIn = _auth!.currentUser!.metadata.lastSignInTime;
+      if (lastSignIn == null ||
+          DateTime.now().difference(lastSignIn) > const Duration(minutes: 5)) {
+        throw FirebaseAuthException(code: 'requires-recent-login');
+      }
       if (_firestore != null && currentUid != null) {
-        try {
-          await _firestore!.collection('users').doc(currentUid).delete();
-        } catch (e) {
-          debugPrint('Error eliminando doc de usuario en Firestore: $e');
-        }
+        await _firestore!.collection('users').doc(currentUid).delete();
       }
-      try {
-        await _auth!.currentUser!.delete();
-      } catch (e) {
-        debugPrint('Error eliminando usuario de FirebaseAuth: $e');
-      }
+      await _auth!.currentUser!.delete();
     }
     _currentMockUser = null;
     _controller.add(null);

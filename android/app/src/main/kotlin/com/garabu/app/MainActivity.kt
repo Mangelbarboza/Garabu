@@ -1,4 +1,4 @@
-package com.example.garabu
+package com.garabu.app
 
 import io.flutter.embedding.android.FlutterActivity
 
